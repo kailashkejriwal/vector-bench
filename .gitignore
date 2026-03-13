@@ -1,0 +1,19 @@
+*.sw[op]
+*.egg-info
+dist/
+__pycache__
+.env
+.data/
+__MACOSX
+.DS_Store
+build/
+venv/
+.venv/
+.idea/
+results/
+logs/
+
+# AI rules
+CLAUDE.md
+AGENTS.md
+/.data
