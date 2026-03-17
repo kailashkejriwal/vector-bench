@@ -48,6 +48,25 @@ class Metric:
     st_conc_latency_p95_list_list: list[list[float]] = field(default_factory=list)
     st_conc_latency_avg_list_list: list[list[float]] = field(default_factory=list)
 
+    # New: Resource usage metrics
+    avg_cpu_usage: float = 0.0  # Average CPU usage during run (%)
+    peak_cpu_usage: float = 0.0  # Peak CPU usage (%)
+    avg_memory_usage: float = 0.0  # Average memory usage (MB)
+    peak_memory_usage: float = 0.0  # Peak memory usage (MB)
+    disk_read_bytes: int = 0  # Total disk read bytes
+    disk_write_bytes: int = 0  # Total disk write bytes
+
+    # New: Detailed query efficiency metrics
+    read_qps: float = 0.0  # Read (search) QPS
+    write_qps: float = 0.0  # Write (insert) QPS
+    update_qps: float = 0.0  # Update QPS (if supported)
+    read_latency_p99: float = 0.0  # Read latency p99 (ms)
+    write_latency_p99: float = 0.0  # Write latency p99 (ms)
+    update_latency_p99: float = 0.0  # Update latency p99 (ms)
+    read_throughput: float = 0.0  # Read throughput (queries/sec)
+    write_throughput: float = 0.0  # Write throughput (inserts/sec)
+    update_throughput: float = 0.0  # Update throughput (updates/sec)
+
 
 QURIES_PER_DOLLAR_METRIC = "QP$ (Quries per Dollar)"
 LOAD_DURATION_METRIC = "load_duration"
@@ -56,6 +75,31 @@ SERIAL_LATENCY_P95_METRIC = "serial_latency_p95"
 MAX_LOAD_COUNT_METRIC = "max_load_count"
 QPS_METRIC = "qps"
 RECALL_METRIC = "recall"
+AVG_CPU_USAGE_METRIC = "avg_cpu_usage"
+PEAK_CPU_USAGE_METRIC = "peak_cpu_usage"
+AVG_MEMORY_USAGE_METRIC = "avg_memory_usage"
+PEAK_MEMORY_USAGE_METRIC = "peak_memory_usage"
+DISK_READ_BYTES_METRIC = "disk_read_bytes"
+DISK_WRITE_BYTES_METRIC = "disk_write_bytes"
+READ_QPS_METRIC = "read_qps"
+WRITE_QPS_METRIC = "write_qps"
+UPDATE_QPS_METRIC = "update_qps"
+READ_LATENCY_P99_METRIC = "read_latency_p99"
+WRITE_LATENCY_P99_METRIC = "write_latency_p99"
+UPDATE_LATENCY_P99_METRIC = "update_latency_p99"
+READ_THROUGHPUT_METRIC = "read_throughput"
+WRITE_THROUGHPUT_METRIC = "write_throughput"
+UPDATE_THROUGHPUT_METRIC = "update_throughput"
+
+# Concurrency & other (results-page "Other" section)
+INSERT_DURATION_METRIC = "insert_duration"
+OPTIMIZE_DURATION_METRIC = "optimize_duration"
+NDCG_METRIC = "ndcg"
+CONC_NUM_LIST_METRIC = "conc_num_list"
+CONC_QPS_LIST_METRIC = "conc_qps_list"
+CONC_LATENCY_P99_LIST_METRIC = "conc_latency_p99_list"
+CONC_LATENCY_P95_LIST_METRIC = "conc_latency_p95_list"
+CONC_LATENCY_AVG_LIST_METRIC = "conc_latency_avg_list"
 
 metric_unit_map = {
     LOAD_DURATION_METRIC: "s",
@@ -63,12 +107,49 @@ metric_unit_map = {
     SERIAL_LATENCY_P95_METRIC: "ms",
     MAX_LOAD_COUNT_METRIC: "K",
     QURIES_PER_DOLLAR_METRIC: "K",
+    AVG_CPU_USAGE_METRIC: "%",
+    PEAK_CPU_USAGE_METRIC: "%",
+    AVG_MEMORY_USAGE_METRIC: "MB",
+    PEAK_MEMORY_USAGE_METRIC: "MB",
+    DISK_READ_BYTES_METRIC: "bytes",
+    DISK_WRITE_BYTES_METRIC: "bytes",
+    READ_QPS_METRIC: "qps",
+    WRITE_QPS_METRIC: "qps",
+    UPDATE_QPS_METRIC: "qps",
+    READ_LATENCY_P99_METRIC: "ms",
+    WRITE_LATENCY_P99_METRIC: "ms",
+    UPDATE_LATENCY_P99_METRIC: "ms",
+    READ_THROUGHPUT_METRIC: "ops/s",
+    WRITE_THROUGHPUT_METRIC: "ops/s",
+    UPDATE_THROUGHPUT_METRIC: "ops/s",
+    INSERT_DURATION_METRIC: "s",
+    OPTIMIZE_DURATION_METRIC: "s",
+    NDCG_METRIC: "(0-1)",
+    CONC_NUM_LIST_METRIC: "",
+    CONC_QPS_LIST_METRIC: "qps",
+    CONC_LATENCY_P99_LIST_METRIC: "s",
+    CONC_LATENCY_P95_LIST_METRIC: "s",
+    CONC_LATENCY_AVG_LIST_METRIC: "s",
 }
 
 lower_is_better_metrics = [
     LOAD_DURATION_METRIC,
     SERIAL_LATENCY_P99_METRIC,
     SERIAL_LATENCY_P95_METRIC,
+    AVG_CPU_USAGE_METRIC,
+    PEAK_CPU_USAGE_METRIC,
+    AVG_MEMORY_USAGE_METRIC,
+    PEAK_MEMORY_USAGE_METRIC,
+    DISK_READ_BYTES_METRIC,
+    DISK_WRITE_BYTES_METRIC,
+    READ_LATENCY_P99_METRIC,
+    WRITE_LATENCY_P99_METRIC,
+    UPDATE_LATENCY_P99_METRIC,
+    INSERT_DURATION_METRIC,
+    OPTIMIZE_DURATION_METRIC,
+    CONC_LATENCY_AVG_LIST_METRIC,
+    CONC_LATENCY_P95_LIST_METRIC,
+    CONC_LATENCY_P99_LIST_METRIC,
 ]
 
 metric_order = [
@@ -78,6 +159,21 @@ metric_order = [
     SERIAL_LATENCY_P99_METRIC,
     SERIAL_LATENCY_P95_METRIC,
     MAX_LOAD_COUNT_METRIC,
+    AVG_CPU_USAGE_METRIC,
+    PEAK_CPU_USAGE_METRIC,
+    AVG_MEMORY_USAGE_METRIC,
+    PEAK_MEMORY_USAGE_METRIC,
+    DISK_READ_BYTES_METRIC,
+    DISK_WRITE_BYTES_METRIC,
+    READ_QPS_METRIC,
+    WRITE_QPS_METRIC,
+    UPDATE_QPS_METRIC,
+    READ_LATENCY_P99_METRIC,
+    WRITE_LATENCY_P99_METRIC,
+    UPDATE_LATENCY_P99_METRIC,
+    READ_THROUGHPUT_METRIC,
+    WRITE_THROUGHPUT_METRIC,
+    UPDATE_THROUGHPUT_METRIC,
 ]
 
 

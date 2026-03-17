@@ -51,7 +51,7 @@ class SerialInsertRunner:
                 msg = f"Insert failed and retried more than {config.MAX_INSERT_RETRY} times"
                 raise RuntimeError(msg) from None
 
-    def task(self) -> int:
+    def task(self) -> tuple[int, float]:
         count = 0
         insert_batch_size = INSERT_BATCH_SIZE
         accum_metadata: list = []
@@ -142,7 +142,7 @@ class SerialInsertRunner:
                 f"({mp.current_process().name:16}) Finish loading all dataset into VectorDB, "
                 f"dur={time.perf_counter() - start}"
             )
-            return count
+            return count, time.perf_counter() - start
 
     def endless_insert_data(self, all_embeddings: list, all_metadata: list, left_id: int = 0) -> int:
         with self.db.init():
@@ -194,7 +194,7 @@ class SerialInsertRunner:
         return count
 
     @utils.time_it
-    def _insert_all_batches(self) -> int:
+    def _insert_all_batches(self) -> tuple[int, float]:
         """Performance case only"""
         with concurrent.futures.ProcessPoolExecutor(
             mp_context=mp.get_context("spawn"),
@@ -202,7 +202,7 @@ class SerialInsertRunner:
         ) as executor:
             future = executor.submit(self.task)
             try:
-                count = future.result(timeout=self.timeout)
+                count, duration = future.result(timeout=self.timeout)
             except TimeoutError as e:
                 msg = f"VectorDB load dataset timeout in {self.timeout}"
                 log.warning(msg)
@@ -213,7 +213,7 @@ class SerialInsertRunner:
                 log.warning(f"VectorDB load dataset error: {e}")
                 raise e from e
             else:
-                return count
+                return count, duration
 
     def run_endlessness(self) -> int:
         """run forever util DB raises exception or crash"""
@@ -250,9 +250,9 @@ class SerialInsertRunner:
         else:
             raise LoadTimeoutError(self.timeout)
 
-    def run(self) -> int:
-        count, _ = self._insert_all_batches()
-        return count
+    def run(self) -> tuple[int, float]:
+        count, duration = self._insert_all_batches()
+        return count, duration
 
 
 class SerialSearchRunner:

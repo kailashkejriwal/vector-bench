@@ -724,7 +724,7 @@ CaseConfigParamInput_EFConstruction_Milvus = CaseConfigInput(
         "max": 512,
         "value": 256,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType]
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None)
     in [
         IndexType.HNSW.value,
         IndexType.HNSW_SQ.value,
@@ -745,6 +745,32 @@ CaseConfigParamInput_EFConstruction_OceanBase = CaseConfigInput(
     },
     isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None)
     in [IndexType.HNSW.value, IndexType.HNSW_SQ.value, IndexType.HNSW_BQ.value],
+)
+
+# ClickHouse HNSW index params (always shown; backend uses HNSW only)
+CaseConfigParamInput_M_Clickhouse = CaseConfigInput(
+    label=CaseConfigParamType.M,
+    displayLabel="M",
+    inputHelp="HNSW graph degree. Higher = better recall, more memory. Default in ClickHouse is 32.",
+    inputType=InputType.Number,
+    inputConfig={"min": 4, "max": 64, "value": 32},
+    isDisplayed=lambda config: True,
+)
+CaseConfigParamInput_EFConstruction_Clickhouse = CaseConfigInput(
+    label=CaseConfigParamType.EFConstruction,
+    displayLabel="efConstruction",
+    inputHelp="HNSW build-time candidate list size. Higher = better recall, longer build. Default in ClickHouse is 128.",
+    inputType=InputType.Number,
+    inputConfig={"min": 8, "max": 512, "value": 128},
+    isDisplayed=lambda config: True,
+)
+CaseConfigParamInput_EF_Clickhouse = CaseConfigInput(
+    label=CaseConfigParamType.EF,
+    displayLabel="ef (search)",
+    inputHelp="Search-time candidate list size. Higher = better recall, higher latency. -1 = use default.",
+    inputType=InputType.Number,
+    inputConfig={"min": -1, "max": MAX_STREAMLIT_INT, "value": 100},
+    isDisplayed=lambda config: True,
 )
 
 CaseConfigParamInput_SQType = CaseConfigInput(
@@ -956,7 +982,7 @@ CaseConfigParamInput_EFConstruction_PgVector = CaseConfigInput(
         "max": 1024,
         "value": 256,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.HNSW.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.HNSW.value,
 )
 
 CaseConfigParamInput_IndexType_ES = CaseConfigInput(
@@ -1051,7 +1077,7 @@ CaseConfigParamInput_EF_Milvus = CaseConfigInput(
         "max": MAX_STREAMLIT_INT,
         "value": 100,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType]
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None)
     in [
         IndexType.HNSW.value,
         IndexType.HNSW_SQ.value,
@@ -1887,7 +1913,7 @@ CaseConfigParamInput_EFConstruction_Vespa = CaseConfigInput(
         "max": 512,
         "value": 200,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.HNSW.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.HNSW.value,
 )
 
 CaseConfigParamInput_INDEX_THREAD_QTY_DURING_FORCE_MERGE_AWSOpensearch = CaseConfigInput(
@@ -2593,7 +2619,7 @@ CaseConfigParamInput_M_Lindorm = CaseConfigInput(
         "max": 100,
         "value": 16,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.HNSW.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.HNSW.value,
     inputHelp="Hnsw M",
 )
 
@@ -2605,7 +2631,7 @@ CaseConfigParamInput_EFConstruction_Lindorm = CaseConfigInput(
         "max": 1000,
         "value": 100,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.HNSW.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.HNSW.value,
     inputHelp="Ef construction",
 )
 
@@ -2617,8 +2643,8 @@ CaseConfigParamInput_Nlist_Lindorm = CaseConfigInput(
         "max": 1000000,
         "value": 10000,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFPQ.value
-    or config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFPQ.value
+    or config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="N list",
 )
 
@@ -2630,8 +2656,8 @@ CaseConfigParamInput_Centroids_Hnsw_M_Lindorm = CaseConfigInput(
         "max": 100,
         "value": 32,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFPQ.value
-    or config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFPQ.value
+    or config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="Centroids Hnsw M",
 )
 
@@ -2643,8 +2669,8 @@ CaseConfigParamInput_Centroids_Hnsw_Ef_Construct = CaseConfigInput(
         "max": 1000,
         "value": 500,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFPQ.value
-    or config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFPQ.value
+    or config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="Centroids Hnsw Ef Construct",
 )
 
@@ -2657,8 +2683,8 @@ CaseConfigParamInput_Centroids_Hnsw_Ef_Search = CaseConfigInput(
         "max": 1000,
         "value": 200,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFPQ.value
-    or config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFPQ.value
+    or config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="Centroids Hnsw Ef Search",
 )
 
@@ -2670,7 +2696,7 @@ CaseConfigParamInput_Exbits_Lindorm = CaseConfigInput(
         "max": 8,
         "value": 0,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="Exbits",
 )
 
@@ -2698,7 +2724,7 @@ CaseConfigParamInput_EFSearch_Lindorm = CaseConfigInput(
         "max": 1000,
         "value": 100,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.HNSW.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.HNSW.value,
     inputHelp="Ef search",
 )
 
@@ -2710,8 +2736,8 @@ CaseConfigParamInput_Nprobe_Lindorm = CaseConfigInput(
         "max": 1000,
         "value": 100,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFPQ.value
-    or config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFPQ.value
+    or config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="N probe",
 )
 
@@ -2723,8 +2749,8 @@ CaseConfigParamInput_ReorderFactor_Lindorm = CaseConfigInput(
         "max": 200,
         "value": 10,
     },
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFPQ.value
-    or config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFPQ.value
+    or config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="Reorder factor",
 )
 
@@ -2732,8 +2758,8 @@ CaseConfigParamInput_ClientRefactor_Lindorm = CaseConfigInput(
     label=CaseConfigParamType.client_refactor,
     inputType=InputType.Bool,
     inputConfig={"value": False},
-    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.IVFPQ.value
-    or config[CaseConfigParamType.IndexType] == IndexType.IVFBQ.value,
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFPQ.value
+    or config.get(CaseConfigParamType.IndexType, None) == IndexType.IVFBQ.value,
     inputHelp="Whether to use client refactor",
 )
 
@@ -2877,6 +2903,12 @@ LindormPerformanceConfig = [
     CaseConfigParamInput_NumberOfRegions_Lindorm,
 ]
 
+ClickhousePerformanceConfig = [
+    CaseConfigParamInput_M_Clickhouse,
+    CaseConfigParamInput_EFConstruction_Clickhouse,
+    CaseConfigParamInput_EF_Clickhouse,
+]
+
 # Map DB to config
 CASE_CONFIG_MAP = {
     DB.Milvus: {
@@ -2971,6 +3003,10 @@ CASE_CONFIG_MAP = {
     DB.Lindorm: {
         CaseLabel.Load: LindormLoadConfig,
         CaseLabel.Performance: LindormPerformanceConfig,
+    },
+    DB.Clickhouse: {
+        CaseLabel.Performance: ClickhousePerformanceConfig,
+        CaseLabel.Streaming: ClickhousePerformanceConfig,
     },
 }
 

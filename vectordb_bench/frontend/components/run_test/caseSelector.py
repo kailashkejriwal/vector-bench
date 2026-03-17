@@ -1,6 +1,7 @@
+from collections import defaultdict
+
 from vectordb_bench.backend.clients import DB
 from vectordb_bench.frontend.components.run_test.inputWidget import inputWidget
-from collections import defaultdict
 from vectordb_bench.frontend.config.dbCaseConfigs import (
     UI_CASE_CLUSTERS,
     UICaseItem,
@@ -9,12 +10,15 @@ from vectordb_bench.frontend.config.dbCaseConfigs import (
     get_custom_case_cluter,
     get_custom_streaming_case_cluster,
 )
+from vectordb_bench.frontend.config.parameter_tooltips import (
+    get_case_param_group,
+    get_case_param_tooltip,
+)
 from vectordb_bench.frontend.config.styles import (
     CASE_CONFIG_SETTING_COLUMNS,
     CHECKBOX_INDENT,
     DB_CASE_CONFIG_SETTING_COLUMNS,
 )
-
 from vectordb_bench.frontend.utils import addHorizontalLine
 from vectordb_bench.models import CaseConfig
 
@@ -75,38 +79,58 @@ def caseConfigSetting(st, uiCaseItem: UICaseItem):
     if len(config_inputs) == 0:
         return
 
-    columns = st.columns(
-        [
-            1,
-            *[DB_CASE_CONFIG_SETTING_COLUMNS / CASE_CONFIG_SETTING_COLUMNS] * CASE_CONFIG_SETTING_COLUMNS,
-        ]
-    )
-    columns[0].markdown(
+    st.markdown(
         f"<div style='margin: 0 0 24px {CHECKBOX_INDENT}px; font-size: 18px; font-weight: 600;'>Custom Config</div>",
         unsafe_allow_html=True,
     )
-    for i, config_input in enumerate(config_inputs):
-        column = columns[1 + i % CASE_CONFIG_SETTING_COLUMNS]
+    current_group = None
+    columns = None
+    col_idx = 0
+    for config_input in config_inputs:
+        group = get_case_param_group(config_input.label.value)
+        if group != current_group:
+            current_group = group
+            if current_group:
+                st.markdown(current_group)
+            columns = st.columns(
+                [1, *[DB_CASE_CONFIG_SETTING_COLUMNS / CASE_CONFIG_SETTING_COLUMNS] * CASE_CONFIG_SETTING_COLUMNS]
+            )
+            col_idx = 0
+        column = columns[1 + col_idx % CASE_CONFIG_SETTING_COLUMNS]
+        rich_help = get_case_param_tooltip(config_input.label.value, config_input.inputHelp)
+        config_with_help = config_input.copy(update={"inputHelp": rich_help})
         key = f"custom-config-{uiCaseItem.label}-{config_input.label.value}"
-        uiCaseItem.tmp_custom_config[config_input.label.value] = inputWidget(column, config=config_input, key=key)
+        uiCaseItem.tmp_custom_config[config_input.label.value] = inputWidget(column, config=config_with_help, key=key)
+        col_idx += 1
 
 
 def dbCaseConfigSetting(st, dbToCaseClusterConfigs, uiCaseItem: UICaseItem, activedDbList: list[DB]):
     for db in activedDbList:
-        columns = st.columns(1 + DB_CASE_CONFIG_SETTING_COLUMNS)
-        # column 0 - title
-        dbColumn = columns[0]
-        dbColumn.markdown(
+        dbCaseConfig = dbToCaseClusterConfigs[db][uiCaseItem]
+        configs = [c for c in get_case_config_inputs(db, uiCaseItem.caseLabel) if c.isDisplayed(dbCaseConfig)]
+        st.markdown(
             f"<div style='margin: 0 0 24px {CHECKBOX_INDENT}px; font-size: 18px; font-weight: 600;'>{db.name}</div>",
             unsafe_allow_html=True,
         )
-        k = 0
-        dbCaseConfig = dbToCaseClusterConfigs[db][uiCaseItem]
-        for config in get_case_config_inputs(db, uiCaseItem.caseLabel):
-            if config.isDisplayed(dbCaseConfig):
-                column = columns[1 + k % DB_CASE_CONFIG_SETTING_COLUMNS]
-                key = "%s-%s-%s" % (db, uiCaseItem.label, config.label.value)
-                dbCaseConfig[config.label] = inputWidget(column, config, key)
-                k += 1
-        if k == 0:
-            columns[1].write("Auto")
+        if not configs:
+            st.write("Auto")
+            continue
+        current_group = None
+        col_idx = 0
+        for config in configs:
+            group = get_case_param_group(config.label.value)
+            if group != current_group:
+                current_group = group
+                if current_group:
+                    st.markdown(
+                        f"<div style='margin-left: {CHECKBOX_INDENT}px; margin-bottom: 8px; font-size: 15px; font-weight: 600;'>**{current_group}**</div>",
+                        unsafe_allow_html=True,
+                    )
+                columns = st.columns(1 + DB_CASE_CONFIG_SETTING_COLUMNS)
+                col_idx = 0
+            column = columns[1 + col_idx % DB_CASE_CONFIG_SETTING_COLUMNS]
+            rich_help = get_case_param_tooltip(config.label.value, config.inputHelp)
+            config_with_help = config.copy(update={"inputHelp": rich_help})
+            key = "%s-%s-%s" % (db, uiCaseItem.label, config.label.value)
+            dbCaseConfig[config.label] = inputWidget(column, config=config_with_help, key=key)
+            col_idx += 1

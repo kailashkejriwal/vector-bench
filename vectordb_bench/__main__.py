@@ -14,8 +14,11 @@ def main():
 
 
 def run_streamlit():
+    import sys
+    venv_dir = pathlib.Path(sys.executable).parent.parent
+    streamlit_path = venv_dir / "bin" / "streamlit"
     cmd = [
-        "streamlit",
+        str(streamlit_path),
         "run",
         f"{pathlib.Path(__file__).parent}/frontend/vdbbench.py",
         "--logger.level",

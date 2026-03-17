@@ -2,7 +2,7 @@ from ..backend.clients.alisql.cli import AliSQLHNSW
 from ..backend.clients.alloydb.cli import AlloyDBScaNN
 from ..backend.clients.aws_opensearch.cli import AWSOpenSearch
 from ..backend.clients.chroma.cli import Chroma
-from ..backend.clients.clickhouse.cli import Clickhouse
+from ..backend.clients.clickhouse.cli import Clickhouse, ClickhouseQBit, ClickhouseFlat
 from ..backend.clients.cockroachdb.cli import CockroachDB as CockroachDBCli
 from ..backend.clients.doris.cli import Doris
 from ..backend.clients.elastic_cloud.cli import (
@@ -60,6 +60,8 @@ cli.add_command(MariaDBHNSW)
 cli.add_command(TiDB)
 cli.add_command(CockroachDBCli)
 cli.add_command(Clickhouse)
+cli.add_command(ClickhouseQBit)
+cli.add_command(ClickhouseFlat)
 cli.add_command(Vespa)
 cli.add_command(LanceDB)
 cli.add_command(HologresHGraph)

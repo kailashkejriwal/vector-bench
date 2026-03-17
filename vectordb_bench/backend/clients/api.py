@@ -14,6 +14,9 @@ class MetricType(StrEnum):
     DP = "DP"
     HAMMING = "HAMMING"
     JACCARD = "JACCARD"
+    L1 = "L1"
+    LINFINITY = "LINFINITY"
+    LP = "LP"
 
 
 class IndexType(StrEnum):
@@ -38,6 +41,7 @@ class IndexType(StrEnum):
     TES_VSEARCH = "vsearch"
     ES_IVFFlat = "ivfflat"
     GPU_IVF_FLAT = "GPU_IVF_FLAT"
+    QBIT = "QBIT"
     GPU_BRUTE_FORCE = "GPU_BRUTE_FORCE"
     GPU_IVF_PQ = "GPU_IVF_PQ"
     GPU_CAGRA = "GPU_CAGRA"

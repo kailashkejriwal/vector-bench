@@ -52,6 +52,14 @@ class ClickhouseIndexConfig(BaseModel, DBCaseConfig):
             return "L2Distance"
         if self.metric_type == MetricType.COSINE:
             return "cosineDistance"
+        if self.metric_type == MetricType.IP:
+            return "dotProduct"
+        if self.metric_type == MetricType.L1:
+            return "L1Distance"
+        if self.metric_type == MetricType.LINFINITY:
+            return "LinfDistance"
+        if self.metric_type == MetricType.LP:
+            return "LpDistance"
         return "cosineDistance"
 
     @abstractmethod
@@ -64,7 +72,7 @@ class ClickhouseHNSWConfig(ClickhouseIndexConfig):
     efConstruction: int | None  # Default in clickhouse in 128
     ef: int | None = None
     index: IndexType = IndexType.HNSW
-    quantization: str | None = "bf16"  # Default is bf16. Possible values are f64, f32, f16, bf16, or i8
+    quantization: str | None = "bf16"  # Default is bf16. Possible values are f64, f32, f16, bf16, i8, b1
     granularity: int | None = 10_000_000  # Size of the index granules. By default, in CH it's equal 10.000.000
 
     def index_param(self) -> dict:
@@ -81,6 +89,60 @@ class ClickhouseHNSWConfig(ClickhouseIndexConfig):
         return {
             "metric_type": self.parse_metric_str(),
             "params": {"ef": self.ef},
+        }
+
+    def session_param(self) -> dict:
+        return {
+            "allow_experimental_vector_similarity_index": 1,
+        }
+
+
+class ClickhouseQBitConfig(ClickhouseIndexConfig):
+    index: IndexType = IndexType.QBIT
+    element_type: str = "Float32"  # Element type: Float32, Float64, BFloat16
+    precision_bits: int = 16  # Runtime precision control (8, 16, 32, 64)
+    create_index_before_load: bool = False  # QBit doesn't use traditional indexes
+    create_index_after_load: bool = False
+
+    def index_param(self) -> dict:
+        return {
+            "vector_data_type": f"QBit({self.element_type}, {{dim}})",  # Placeholder for dimension
+            "metric_type": self.parse_metric_str(),
+            "index_type": self.index.value,
+            "element_type": self.element_type,
+            "precision_bits": self.precision_bits,
+            "params": {},
+        }
+
+    def search_param(self) -> dict:
+        return {
+            "metric_type": self.parse_metric_str(),
+            "params": {"precision_bits": self.precision_bits},
+        }
+
+    def session_param(self) -> dict:
+        return {
+            "allow_experimental_vector_similarity_index": 1,
+        }
+
+
+class ClickhouseFlatConfig(ClickhouseIndexConfig):
+    index: IndexType = IndexType.Flat
+    create_index_before_load: bool = False  # Flat search doesn't use indexes
+    create_index_after_load: bool = False
+
+    def index_param(self) -> dict:
+        return {
+            "vector_data_type": self.vector_data_type,
+            "metric_type": self.parse_metric_str(),
+            "index_type": self.index.value,
+            "params": {},
+        }
+
+    def search_param(self) -> dict:
+        return {
+            "metric_type": self.parse_metric_str(),
+            "params": {},
         }
 
     def session_param(self) -> dict:

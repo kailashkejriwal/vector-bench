@@ -52,6 +52,11 @@ def main():
     getResults(resultesContainer, "vectordb_bench")
 
     # charts
+    if not showCaseNames and not failedTasks:
+        st.info(
+            "No results to display for the selected run(s). "
+            "Check that result files (result_*.json) exist in the results directory for that run and that the run completed successfully."
+        )
     drawCharts(st, shownData, failedTasks, showCaseNames)
 
     # footer

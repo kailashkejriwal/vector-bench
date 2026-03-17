@@ -11,7 +11,7 @@ from ....cli.cli import (
     run,
 )
 from .. import DB
-from .config import ClickhouseHNSWConfig
+from .config import ClickhouseHNSWConfig, ClickhouseQBitConfig, ClickhouseFlatConfig
 
 
 class ClickhouseTypedDict(TypedDict):
@@ -39,7 +39,18 @@ class ClickhouseTypedDict(TypedDict):
     ]
 
 
-class ClickhouseHNSWTypedDict(CommonTypedDict, ClickhouseTypedDict, HNSWFlavor2): ...
+class ClickhouseQBitTypedDict(CommonTypedDict, ClickhouseTypedDict):
+    element_type: Annotated[
+        str,
+        click.option("--element-type", type=str, default="Float32", help="QBit element type (Float32, Float64, BFloat16)")
+    ]
+    precision_bits: Annotated[
+        int,
+        click.option("--precision-bits", type=int, default=16, help="Runtime precision bits (8, 16, 32, 64)")
+    ]
+
+
+class ClickhouseFlatTypedDict(CommonTypedDict, ClickhouseTypedDict): ...
 
 
 @cli.command()
@@ -63,5 +74,50 @@ def Clickhouse(**parameters: Unpack[ClickhouseHNSWTypedDict]):
             efConstruction=parameters["ef_construction"],
             ef=parameters["ef_runtime"],
         ),
+        **parameters,
+    )
+
+
+@cli.command()
+@click_parameter_decorators_from_typed_dict(ClickhouseQBitTypedDict)
+def ClickhouseQBit(**parameters: Unpack[ClickhouseQBitTypedDict]):
+    from .config import ClickhouseConfig
+
+    run(
+        db=DB.Clickhouse,
+        db_config=ClickhouseConfig(
+            db_label=parameters["db_label"],
+            user=parameters["user"],
+            password=SecretStr(parameters["password"]) if parameters["password"] else None,
+            host=parameters["host"],
+            port=parameters["port"],
+            ssl=parameters["ssl"],
+            ssl_ca_certs=parameters["ssl_ca_certs"],
+        ),
+        db_case_config=ClickhouseQBitConfig(
+            element_type=parameters["element_type"],
+            precision_bits=parameters["precision_bits"],
+        ),
+        **parameters,
+    )
+
+
+@cli.command()
+@click_parameter_decorators_from_typed_dict(ClickhouseFlatTypedDict)
+def ClickhouseFlat(**parameters: Unpack[ClickhouseFlatTypedDict]):
+    from .config import ClickhouseConfig
+
+    run(
+        db=DB.Clickhouse,
+        db_config=ClickhouseConfig(
+            db_label=parameters["db_label"],
+            user=parameters["user"],
+            password=SecretStr(parameters["password"]) if parameters["password"] else None,
+            host=parameters["host"],
+            port=parameters["port"],
+            ssl=parameters["ssl"],
+            ssl_ca_certs=parameters["ssl_ca_certs"],
+        ),
+        db_case_config=ClickhouseFlatConfig(),
         **parameters,
     )

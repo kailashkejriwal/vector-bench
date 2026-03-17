@@ -186,15 +186,23 @@ class CaseRunner(BaseModel):
         """
 
         log.info("Start performance case")
+        monitor = utils.ResourceMonitor()
+        monitor.start_monitoring()
         try:
             m = Metric()
+            num_inserts = 0
+            load_dur = 0.0
             if drop_old:
                 if TaskStage.LOAD in self.config.stages:
-                    _, load_dur = self._load_train_data()
+                    # _load_train_data is @time_it; runner.run() also returns time_it from _insert_all_batches -> double wrap
+                    outer, _ = self._load_train_data()
+                    (num_inserts, load_dur), _ = outer
                     build_dur = self._optimize()
                     m.insert_duration = round(load_dur, 4)
                     m.optimize_duration = round(build_dur, 4)
                     m.load_duration = round(load_dur + build_dur, 4)
+                    m.write_qps = num_inserts / load_dur if load_dur > 0 else 0.0
+                    m.write_throughput = m.write_qps
                     log.info(
                         f"Finish loading the entire dataset into VectorDB,"
                         f" insert_duration={load_dur}, optimize_duration={build_dur}"
@@ -202,6 +210,8 @@ class CaseRunner(BaseModel):
                     )
                 else:
                     log.info("Data loading skipped")
+                    m.write_qps = 0.0
+                    m.write_throughput = 0.0
             if TaskStage.SEARCH_SERIAL in self.config.stages or TaskStage.SEARCH_CONCURRENT in self.config.stages:
                 self._init_search_runner()
                 if TaskStage.SEARCH_CONCURRENT in self.config.stages:
@@ -214,9 +224,14 @@ class CaseRunner(BaseModel):
                         m.conc_latency_p95_list,
                         m.conc_latency_avg_list,
                     ) = search_results
+                    m.read_qps = m.qps
+                    m.read_throughput = m.qps
                 if TaskStage.SEARCH_SERIAL in self.config.stages:
                     search_results = self._serial_search()
                     m.recall, m.ndcg, m.serial_latency_p99, m.serial_latency_p95 = search_results
+                    m.read_qps = len(self.test_emb) / (m.serial_latency_p99 / 1000) if m.serial_latency_p99 > 0 else 0.0  # Approximate
+                    m.read_latency_p99 = m.serial_latency_p99
+                    m.read_throughput = m.read_qps
 
         except Exception as e:
             log.warning(f"Failed to run performance case, reason = {e}")
@@ -225,6 +240,14 @@ class CaseRunner(BaseModel):
         else:
             log.info(f"Performance case got result: {m}")
             return m
+        finally:
+            resource_metrics = monitor.stop_monitoring()
+            m.avg_cpu_usage = resource_metrics.get('avg_cpu_usage', 0.0)
+            m.peak_cpu_usage = resource_metrics.get('peak_cpu_usage', 0.0)
+            m.avg_memory_usage = resource_metrics.get('avg_memory_usage', 0.0)
+            m.peak_memory_usage = resource_metrics.get('peak_memory_usage', 0.0)
+            m.disk_read_bytes = resource_metrics.get('disk_read_bytes', 0)
+            m.disk_write_bytes = resource_metrics.get('disk_write_bytes', 0)
 
     def _run_streaming_case(self) -> Metric:
         log.info("Start streaming case")
@@ -240,7 +263,7 @@ class CaseRunner(BaseModel):
             return m
 
     @utils.time_it
-    def _load_train_data(self):
+    def _load_train_data(self) -> tuple[int, float]:
         """Insert train data and get the insert_duration"""
         try:
             runner = SerialInsertRunner(
@@ -250,7 +273,7 @@ class CaseRunner(BaseModel):
                 self.ca.filters,
                 self.ca.load_timeout,
             )
-            runner.run()
+            return runner.run()
         except Exception as e:
             raise e from None
         finally:

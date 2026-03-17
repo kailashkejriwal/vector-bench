@@ -37,9 +37,11 @@ def getshownResults(
     default_selected_task_labels: list[str] = [],
     **kwargs,
 ) -> list[CaseResult]:
+    # Use unique labels so each run is selectable (use run_id when task_label == run_id)
     resultSelectOptions = [
-        result.task_label if result.task_label != result.run_id else f"res-{result.run_id[:4]}" for result in results
+        result.task_label if result.task_label != result.run_id else result.run_id for result in results
     ]
+
     if len(resultSelectOptions) == 0:
         st.write("There are no results to display. Please wait for the task to complete or run a new task.")
         return []
@@ -52,7 +54,8 @@ def getshownResults(
     )
     selectedResult: list[CaseResult] = []
     for option in selectedResultSelectedOptions:
-        case_results = results[resultSelectOptions.index(option)].results
+        idx = resultSelectOptions.index(option)
+        case_results = results[idx].results
         selectedResult += [r for r in case_results if case_results_filter(r)]
 
     return selectedResult

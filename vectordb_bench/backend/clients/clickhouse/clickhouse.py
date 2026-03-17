@@ -9,7 +9,7 @@ from clickhouse_driver import Client as NativeClient
 
 from vectordb_bench import config
 
-from .. import IndexType
+from .. import IndexType, MetricType
 from ..api import VectorDB
 from .config import ClickhouseConfigDict, ClickhouseIndexConfig
 
@@ -150,8 +150,14 @@ class Clickhouse(VectorDB):
                         f"GRANULARITY {self.index_param['granularity']}"
                     )
                 self.conn.execute(query)
+            elif self.index_param["index_type"] == IndexType.QBIT.value:
+                # QBit doesn't require traditional vector indexes
+                log.info("QBit index type selected - no traditional index creation needed")
+            elif self.index_param["index_type"] == IndexType.Flat.value:
+                # Flat search doesn't use indexes
+                log.info("Flat index type selected - no index creation needed")
             else:
-                log.warning("HNSW is only available method in clickhouse now")
+                log.warning("Unsupported index type: %s", self.index_param["index_type"])
         except Exception as e:
             log.warning(
                 "Failed to create Clickhouse vector index on table %s: %s",
@@ -163,10 +169,16 @@ class Clickhouse(VectorDB):
     def _create_table(self, dim: int):
         assert self.conn is not None, "Connection is not initialized"
         try:
+            # Handle QBit data type specially
+            if self.index_param['index_type'] == IndexType.QBIT.value:
+                vector_type = self.index_param['vector_data_type'].format(dim=dim)
+            else:
+                vector_type = f"Array({self.index_param['vector_data_type']})"
+
             self.conn.execute(
                 f"CREATE TABLE IF NOT EXISTS {self.db_config['database']}.{self.table_name} "
                 f"({self._primary_field} UInt32, "
-                f"{self._vector_field} Array({self.index_param['vector_data_type']}) CODEC(NONE), "
+                f"{self._vector_field} {vector_type} CODEC(NONE), "
                 f"CONSTRAINT same_length CHECK length(embedding) = {dim}) "
                 f"ENGINE = MergeTree() "
                 f"ORDER BY {self._primary_field}"
@@ -224,33 +236,50 @@ class Clickhouse(VectorDB):
         # ClickHouse's arrayCosineDistance may require Array for the query vector.
         query_as_list = list(query)
 
-        if self.case_config.metric_type == "COSINE":
-            # Explicit cast to Array(Float32) so server accepts the bound parameter.
+        # Handle QBit search with precision control
+        if self.index_param["index_type"] == IndexType.QBIT.value:
+            precision_bits = self.search_param["params"].get("precision_bits", 16)
             if filters:
                 sql = (
                     f"SELECT {self._primary_field} FROM {db}.{table} "
                     f"WHERE {self._primary_field} > %(gt)s "
-                    f"ORDER BY cosineDistance({self._vector_field}, cast(%(query)s AS Array(Float32))) "
+                    f"ORDER BY L2DistanceTransposed({self._vector_field}, cast(%(query)s AS Array(Float32)), {precision_bits}) "
                     f"LIMIT %(k)s"
                 )
             else:
                 sql = (
                     f"SELECT {self._primary_field} FROM {db}.{table} "
-                    f"ORDER BY cosineDistance({self._vector_field}, cast(%(query)s AS Array(Float32))) "
+                    f"ORDER BY L2DistanceTransposed({self._vector_field}, cast(%(query)s AS Array(Float32)), {precision_bits}) "
                     f"LIMIT %(k)s"
                 )
         else:
+            # Handle traditional distance functions
+            if self.case_config.metric_type == MetricType.COSINE:
+                distance_func = "cosineDistance"
+            elif self.case_config.metric_type == MetricType.L2:
+                distance_func = "L2Distance"
+            elif self.case_config.metric_type == MetricType.IP:
+                distance_func = "dotProduct"
+            elif self.case_config.metric_type == MetricType.L1:
+                distance_func = "L1Distance"
+            elif self.case_config.metric_type == MetricType.LINFINITY:
+                distance_func = "LinfDistance"
+            elif self.case_config.metric_type == MetricType.LP:
+                distance_func = "LpDistance"
+            else:
+                distance_func = "L2Distance"  # Default fallback
+
             if filters:
                 sql = (
                     f"SELECT {self._primary_field} FROM {db}.{table} "
                     f"WHERE {self._primary_field} > %(gt)s "
-                    f"ORDER BY L2Distance({self._vector_field}, cast(%(query)s AS Array(Float32))) "
+                    f"ORDER BY {distance_func}({self._vector_field}, cast(%(query)s AS Array(Float32))) "
                     f"LIMIT %(k)s"
                 )
             else:
                 sql = (
                     f"SELECT {self._primary_field} FROM {db}.{table} "
-                    f"ORDER BY L2Distance({self._vector_field}, cast(%(query)s AS Array(Float32))) "
+                    f"ORDER BY {distance_func}({self._vector_field}, cast(%(query)s AS Array(Float32))) "
                     f"LIMIT %(k)s"
                 )
 
