@@ -26,6 +26,11 @@ PLACEHOLDER_CONFIG: dict[DB, dict] = {
     DB.QdrantLocal: {
         "url": "http://127.0.0.1:6333",
     },
+    DB.WeaviateCloud: {
+        "url": "http://127.0.0.1:8080",
+        "api_key": "",
+        "no_auth": True,
+    },
 }
 
 

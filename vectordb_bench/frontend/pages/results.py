@@ -11,6 +11,9 @@ from vectordb_bench.frontend.components.check_results.nav import (
 )
 from vectordb_bench.frontend.components.check_results.charts import drawCharts
 from vectordb_bench.frontend.components.check_results.filters import getshownData
+from vectordb_bench.frontend.components.check_results.results_summary import (
+    draw_results_summary,
+)
 from vectordb_bench.frontend.components.get_results.saveAsImage import getResults
 
 from vectordb_bench.interface import benchmark_runner
@@ -50,6 +53,9 @@ def main():
     # save or share
     resultesContainer = st.sidebar.container()
     getResults(resultesContainer, "vectordb_bench")
+
+    # summary: what and how many tests per database
+    draw_results_summary(st, shownData, failedTasks, showCaseNames)
 
     # charts
     if not showCaseNames and not failedTasks:

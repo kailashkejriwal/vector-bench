@@ -43,6 +43,7 @@ dependencies = [
     "ujson",
     "hdrhistogram>=0.10.1",
     "qdrant-client",
+    "weaviate-client",
 ]
 dynamic = ["version"]
 

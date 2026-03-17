@@ -12,6 +12,7 @@ from .milvus_provisioner import MilvusDockerProvisioner
 from .milvus_kubectl_provisioner import MilvusKubernetesProvisioner
 from .pgvector_provisioner import PgVectorDockerProvisioner
 from .qdrant_provisioner import QdrantDockerProvisioner
+from .weaviate_provisioner import WeaviateDockerProvisioner
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ _PROVISIONER_REGISTRY: dict[DB, tuple[type[Provisioner], Callable[[ConnectionInf
     DB.Milvus: (MilvusDockerProvisioner, MilvusDockerProvisioner.connection_info_to_db_config),
     DB.Clickhouse: (ClickhouseDockerProvisioner, ClickhouseDockerProvisioner.connection_info_to_db_config),
     DB.QdrantLocal: (QdrantDockerProvisioner, QdrantDockerProvisioner.connection_info_to_db_config),
+    DB.WeaviateCloud: (WeaviateDockerProvisioner, WeaviateDockerProvisioner.connection_info_to_db_config),
 }
 
 # Kubernetes provisioners (when VECTORDB_PROVISION_BACKEND=kubectl)

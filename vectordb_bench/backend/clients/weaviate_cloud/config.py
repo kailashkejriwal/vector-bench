@@ -8,6 +8,11 @@ class WeaviateConfig(DBConfig):
     api_key: SecretStr
     no_auth: bool | None = False
 
+    @staticmethod
+    def common_short_configs() -> list[str]:
+        """Allow empty api_key for local / no-auth (e.g. auto-provisioned) Weaviate."""
+        return ["version", "db_label", "api_key"]
+
     def to_dict(self) -> dict:
         return {
             "url": self.url.get_secret_value(),
