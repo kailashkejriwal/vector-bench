@@ -22,12 +22,12 @@ def getshownData(st, results: list[TestResult], filter_type: FilterOp = FilterOp
 
     st.header("Filters")
 
-    shownResults = getshownResults(st, results, **kwargs)
+    shownResults, selected_labels = getshownResults(st, results, **kwargs)
     showDBNames, showCaseNames = getShowDbsAndCases(st, shownResults, filter_type)
 
     shownData, failedTasks = getChartData(shownResults, showDBNames, showCaseNames)
 
-    return shownData, failedTasks, showCaseNames
+    return shownData, failedTasks, showCaseNames, selected_labels
 
 
 def getshownResults(
@@ -36,7 +36,7 @@ def getshownResults(
     case_results_filter: Callable[[CaseResult], bool] = lambda x: True,
     default_selected_task_labels: list[str] = [],
     **kwargs,
-) -> list[CaseResult]:
+) -> tuple[list[CaseResult], list[str]]:
     # Use unique labels so each run is selectable (use run_id when task_label == run_id)
     resultSelectOptions = [
         result.task_label if result.task_label != result.run_id else result.run_id for result in results
@@ -44,7 +44,7 @@ def getshownResults(
 
     if len(resultSelectOptions) == 0:
         st.write("There are no results to display. Please wait for the task to complete or run a new task.")
-        return []
+        return [], []
 
     selectedResultSelectedOptions = st.multiselect(
         "Select the task results you need to analyze.",
@@ -58,7 +58,7 @@ def getshownResults(
         case_results = results[idx].results
         selectedResult += [r for r in case_results if case_results_filter(r)]
 
-    return selectedResult
+    return selectedResult, list(selectedResultSelectedOptions)
 
 
 def getShowDbsAndCases(st, result: list[CaseResult], filter_type: FilterOp) -> tuple[list[str], list[str]]:

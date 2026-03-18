@@ -41,7 +41,7 @@ def main():
     st.caption("We welcome community contributions for better results, parameter configurations, and optimizations.")
     # results selector and filter
     resultSelectorContainer = st.sidebar.container()
-    shownData, failedTasks, showCaseNames = getshownData(resultSelectorContainer, allResults)
+    shownData, failedTasks, showCaseNames, selected_labels = getshownData(resultSelectorContainer, allResults)
 
     resultSelectorContainer.divider()
 
@@ -50,9 +50,13 @@ def main():
     NavToRunTest(navContainer)
     NavToQuriesPerDollar(navContainer)
 
-    # save or share
+    # save or share (Excel uses current filter selection)
     resultesContainer = st.sidebar.container()
-    getResults(resultesContainer, "vectordb_bench")
+    getResults(
+        resultesContainer,
+        "vectordb_bench",
+        results_export_data=(shownData, failedTasks, selected_labels or []),
+    )
 
     # summary: what and how many tests per database
     draw_results_summary(st, shownData, failedTasks, showCaseNames)

@@ -46,7 +46,7 @@ def main():
 
     # results selector
     resultSelectorContainer = st.sidebar.container()
-    shownData, _, showCaseNames = getshownData(resultSelectorContainer, checkedResults)
+    shownData, _, showCaseNames, _ = getshownData(resultSelectorContainer, checkedResults)
 
     resultSelectorContainer.divider()
 

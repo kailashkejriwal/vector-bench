@@ -55,7 +55,7 @@ def main():
     def case_results_filter(case_result: CaseResult) -> bool:
         return len(case_result.metrics.st_search_stage_list) > 0
 
-    shownData, _, showCaseNames = getshownData(
+    shownData, _, showCaseNames, _ = getshownData(
         resultSelectorContainer, checkedResults, case_results_filter=case_results_filter
     )
 

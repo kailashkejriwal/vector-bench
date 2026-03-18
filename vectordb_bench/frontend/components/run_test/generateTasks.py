@@ -23,27 +23,47 @@ def _fill_default_case_params(db: DB, case: CaseConfig, cfg: dict) -> None:
             cfg[key] = config_input.inputConfig["value"]
 
 
-def generate_tasks(activedDbList: list[DB], dbConfigs, activedCaseList: list[CaseConfig], allCaseConfigs, db_auto_provision_config=None):
+def _expanded_instances(actived_db_list: list[DB], instance_count: dict[DB, int]):
+    """Yield (db, instance_idx) for each instance (0-based)."""
+    for db in actived_db_list:
+        count = instance_count.get(db, 1)
+        for instance_idx in range(count):
+            yield db, instance_idx
+
+
+def generate_tasks(
+    actived_db_list: list[DB],
+    db_configs: dict,
+    actived_case_list: list[CaseConfig],
+    all_case_configs: dict,
+    db_auto_provision_config: dict | None = None,
+    instance_count: dict[DB, int] | None = None,
+):
     if db_auto_provision_config is None:
         db_auto_provision_config = {}
+    if instance_count is None:
+        instance_count = {db: 1 for db in actived_db_list}
     tasks = []
-    for db in activedDbList:
-        auto_prov = db_auto_provision_config.get(db, {})
+    for db, instance_idx in _expanded_instances(actived_db_list, instance_count):
+        key = (db, instance_idx)
+        auto_prov = db_auto_provision_config.get(key, {})
         auto_start = auto_prov.get("auto_start", False)
         instance_config = auto_prov.get("instance_config")
-        for case in activedCaseList:
-            cfg = {key.value: value for key, value in allCaseConfigs[db][case].items()}
+        db_config = db_configs[key]
+        # Ensure unique label when multiple instances of same DB so results/charts distinguish them
+        if instance_count.get(db, 1) > 1 and not (getattr(db_config, "db_label", None) or "").strip():
+            db_config = db_config.copy(update={"db_label": f"instance-{instance_idx + 1}"})
+        for case in actived_case_list:
+            cfg = {key.value: value for key, value in all_case_configs[key][case].items()}
             # Many DBCaseConfig models require an `index` field, while the UI stores the selection under `IndexType`.
-            # Passing both keeps backwards-compatibility (extra fields are ignored) and enables strict models (e.g. OceanBase).
-            if CaseConfigParamType.IndexType in allCaseConfigs[db][case] and "index" not in cfg:
-                cfg["index"] = allCaseConfigs[db][case][CaseConfigParamType.IndexType]
-            # Fill defaults for params that were not displayed (e.g. M, efConstruction when IndexType was not yet set)
+            if CaseConfigParamType.IndexType in all_case_configs[key][case] and "index" not in cfg:
+                cfg["index"] = all_case_configs[key][case][CaseConfigParamType.IndexType]
             _fill_default_case_params(db, case, cfg)
             task = TaskConfig(
                 db=db.value,
-                db_config=dbConfigs[db],
+                db_config=db_config,
                 case_config=case,
-                db_case_config=db.case_config_cls(allCaseConfigs[db][case].get(CaseConfigParamType.IndexType, None))(
+                db_case_config=db.case_config_cls(all_case_configs[key][case].get(CaseConfigParamType.IndexType, None))(
                     **cfg
                 ),
                 auto_start=auto_start,

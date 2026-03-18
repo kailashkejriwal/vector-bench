@@ -1,10 +1,16 @@
 """
-Summary of which queries (cases) were run and how many times.
+Summary of which queries (cases) were run, which databases/instances were selected,
+and the tuning parameters used for each.
 """
 
-from collections import Counter
+from collections import Counter, OrderedDict
 
 import streamlit as st
+
+
+def _readable_param_key(key: str) -> str:
+    """Convert param key to readable form: 'ef_construction' -> 'Ef construction'."""
+    return key.replace("_", " ").title()
 
 
 def get_query_run_counts(shown_data: list[dict]) -> dict[str, int]:
@@ -17,15 +23,46 @@ def get_query_run_counts(shown_data: list[dict]) -> dict[str, int]:
     return dict(Counter(d["case_name"] for d in shown_data))
 
 
+def get_databases_and_tuning(shown_data: list[dict]) -> OrderedDict[str, dict]:
+    """
+    Return unique databases/instances (bar_display_name) in display order,
+    each with one representative tuning_params dict for the summary.
+    """
+    if not shown_data:
+        return OrderedDict()
+    seen = OrderedDict()
+    for d in shown_data:
+        name = d.get("bar_display_name") or d.get("db_name", "")
+        if name and name not in seen:
+            seen[name] = d.get("tuning_params") or {}
+    return seen
+
+
 def draw_results_summary(st, shown_data: list[dict], failed_tasks: dict, show_case_names: list[str]):
-    """Render summary: which queries were run and how many times."""
+    """Render summary: databases in the run, tuning per database, and query run counts."""
     if not shown_data and not failed_tasks:
         return
     counts = get_query_run_counts(shown_data)
-    if not counts:
-        return
+    db_tuning = get_databases_and_tuning(shown_data)
 
     with st.expander("Summary", expanded=True):
-        for case_name in sorted(counts.keys()):
-            n = counts[case_name]
-            st.markdown(f"{case_name}: {n} time{'s' if n != 1 else ''}")
+        if db_tuning:
+            st.markdown("**Databases in this run**")
+            st.markdown(", ".join(db_tuning.keys()))
+            st.markdown("")
+            st.markdown("**Configurations per instance**")
+            for bar_name, params in db_tuning.items():
+                if params:
+                    parts = [
+                        f"{_readable_param_key(k)}: {getattr(v, 'value', v)}"
+                        for k, v in sorted(params.items())
+                    ]
+                    st.markdown(f"- **{bar_name}:** {', '.join(parts)}")
+                else:
+                    st.markdown(f"- **{bar_name}:** —")
+            st.markdown("")
+        if counts:
+            st.markdown("**Queries run**")
+            for case_name in sorted(counts.keys()):
+                n = counts[case_name]
+                st.markdown(f"{case_name}: {n} time{'s' if n != 1 else ''}")

@@ -102,7 +102,13 @@ class BenchMarkRunner:
 
     def _try_get_signal(self):
         while self.receive_conn and self.receive_conn.poll():
-            sig, received = self.receive_conn.recv()
+            try:
+                sig, received = self.receive_conn.recv()
+            except (EOFError, BrokenPipeError, OSError) as e:
+                log.warning("Benchmark pipe closed or broken: %s", e)
+                self._clear_running_task()
+                self.receive_conn = None
+                return
             log.debug(f"Sigal received to process: {sig}, {received}")
             if sig == SIGNAL.ERROR:
                 self.latest_error = received
@@ -250,7 +256,10 @@ class BenchMarkRunner:
             self.running_task = None
 
         if self.receive_conn:
-            self.receive_conn.close()
+            try:
+                self.receive_conn.close()
+            except (EOFError, BrokenPipeError, OSError):
+                pass
             self.receive_conn = None
 
     def _run_async(self, conn: Connection) -> bool:

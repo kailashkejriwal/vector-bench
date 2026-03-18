@@ -44,7 +44,7 @@ def main():
         return case.label == CaseLabel.Performance and case.filters.type == FilterOp.NonFilter
 
     default_selected_task_labels = ["standard_2025"]
-    shownData, failedTasks, showCaseNames = getshownData(
+    shownData, failedTasks, showCaseNames, _ = getshownData(
         resultSelectorContainer,
         allResults,
         case_results_filter=case_results_filter,

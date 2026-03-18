@@ -34,7 +34,7 @@ def main():
 
     # results selector and filter
     resultSelectorContainer = st.sidebar.container()
-    shownData, failedTasks, showCaseNames = getshownData(
+    shownData, failedTasks, showCaseNames, _ = getshownData(
         resultSelectorContainer, allResults, filter_type=FilterOp.NumGE
     )
 

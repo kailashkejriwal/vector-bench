@@ -13,18 +13,34 @@ from vectordb_bench.frontend.config.parameter_tooltips import (
 from vectordb_bench.frontend.utils import inputIsPassword
 
 
-def dbConfigSettings(st, activedDbList: list[DB]):
+def _expanded_instances(actived_db_list: list[DB], instance_count: dict[DB, int]):
+    """Yield (db, instance_idx) for each instance to configure (0-based index)."""
+    for db in actived_db_list:
+        count = instance_count.get(db, 1)
+        for instance_idx in range(count):
+            yield db, instance_idx
+
+
+def dbConfigSettings(st, actived_db_list: list[DB], instance_count: dict[DB, int] | None = None):
+    if instance_count is None:
+        instance_count = {db: 1 for db in actived_db_list}
     expander = st.expander("Configurations for the selected databases", True)
 
     dbConfigs = {}
     db_auto_provision_config = {}
     isAllValid = True
-    for activeDb in activedDbList:
+    for activeDb, instance_idx in _expanded_instances(actived_db_list, instance_count):
         dbConfigSettingItemContainer = expander.container()
-        dbConfig, auto_start, instance_config = dbConfigSettingItem(dbConfigSettingItemContainer, activeDb)
-        db_auto_provision_config[activeDb] = {"auto_start": auto_start, "instance_config": instance_config}
+        dbConfig, auto_start, instance_config = dbConfigSettingItem(
+            dbConfigSettingItemContainer,
+            activeDb,
+            instance_idx=instance_idx,
+            instance_total=instance_count.get(activeDb, 1),
+        )
+        key = (activeDb, instance_idx)
+        db_auto_provision_config[key] = {"auto_start": auto_start, "instance_config": instance_config}
         try:
-            dbConfigs[activeDb] = activeDb.config_cls(**dbConfig)
+            dbConfigs[key] = activeDb.config_cls(**dbConfig)
         except ValidationError as e:
             isAllValid = False
             errTexts = []
@@ -39,9 +55,15 @@ def dbConfigSettings(st, activedDbList: list[DB]):
     return dbConfigs, isAllValid, db_auto_provision_config
 
 
-def dbConfigSettingItem(st, activeDb: DB):
+def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total: int = 1):
+    display_name = (
+        f"{activeDb.value} — Instance {instance_idx + 1}"
+        if instance_total > 1
+        else activeDb.value
+    )
+    key_prefix = f"{activeDb.name}-inst{instance_idx}-"
     st.markdown(
-        f"<div style='font-weight: 600; font-size: 20px; margin-top: 16px;'>{activeDb.value}</div>",
+        f"<div style='font-weight: 600; font-size: 20px; margin-top: 16px;'>{display_name}</div>",
         unsafe_allow_html=True,
     )
 
@@ -52,7 +74,7 @@ def dbConfigSettingItem(st, activeDb: DB):
     auto_start = st.checkbox(
         "Auto-start container for this database",
         value=False,
-        key=f"{activeDb.name}-auto-start",
+        key=f"{key_prefix}auto-start",
         disabled=not can_auto_provision,
         help="Start a Docker container for this database, run benchmarks, then tear it down. Connection fields will be filled automatically."
         if can_auto_provision
@@ -67,14 +89,14 @@ def dbConfigSettingItem(st, activeDb: DB):
             use_custom = st.radio(
                 "Config",
                 ["Use default", "Custom manifest / overrides"],
-                key=f"{activeDb.name}-instance-config-mode",
+                key=f"{key_prefix}instance-config-mode",
             )
             if use_custom == "Custom manifest / overrides":
                 manifest_yaml = st.text_area(
                     "Custom manifest (Kubernetes or Docker Compose YAML)",
                     value="",
                     height=120,
-                    key=f"{activeDb.name}-manifest-yaml",
+                    key=f"{key_prefix}manifest-yaml",
                     placeholder="Optional. Leave empty to use default image with overrides only.",
                     help="Custom YAML to run the DB (e.g. Kubernetes Deployment). Overrides default image and resources.",
                 )
@@ -84,14 +106,14 @@ def dbConfigSettingItem(st, activeDb: DB):
                 cpu = col1.text_input(
                     "CPU",
                     value="",
-                    key=f"{activeDb.name}-override-cpu",
+                    key=f"{key_prefix}override-cpu",
                     placeholder="e.g. 4",
                     help=get_db_config_tooltip("cpu"),
                 )
                 memory = col2.text_input(
                     "Memory (GB)",
                     value="",
-                    key=f"{activeDb.name}-override-memory",
+                    key=f"{key_prefix}override-memory",
                     placeholder="e.g. 8Gi or 16GB",
                     help=get_db_config_tooltip("memory"),
                 )
@@ -142,14 +164,14 @@ def dbConfigSettingItem(st, activeDb: DB):
                 column.text_input(
                     key,
                     value=str(placeholder[key]),
-                    key=f"{activeDb.name}-{key}",
+                    key=f"{key_prefix}{key}",
                     disabled=True,
                     help="Filled automatically when container starts.",
                 )
             else:
                 input_value = column.text_input(
                     key,
-                    key=f"{activeDb.name}-{key}",
+                    key=f"{key_prefix}{key}",
                     value=prop.get("default", ""),
                     type="password" if inputIsPassword(key) else "default",
                     placeholder="optional" if key not in required_fields else None,
@@ -161,12 +183,13 @@ def dbConfigSettingItem(st, activeDb: DB):
     # Result labeling (common short)
     if dbConfigClass.common_short_configs():
         st.markdown("Result labeling")
+        default_label = f"instance-{instance_idx + 1}" if instance_total > 1 else ""
         cols = st.columns(DB_CONFIG_SETTING_COLUMNS)
         for i, key in enumerate(dbConfigClass.common_short_configs()):
             dbConfig[key] = cols[i % DB_CONFIG_SETTING_COLUMNS].text_input(
                 key,
-                key="%s-%s" % (activeDb.name, key),
-                value="",
+                key=f"{key_prefix}{key}",
+                value=default_label if key == "db_label" else "",
                 type="default",
                 placeholder="optional, for labeling results",
                 help=get_db_config_tooltip(key) or None,
@@ -176,7 +199,7 @@ def dbConfigSettingItem(st, activeDb: DB):
     for key in dbConfigClass.common_long_configs():
         dbConfig[key] = st.text_area(
             key,
-            key="%s-%s" % (activeDb.name, key),
+            key=f"{key_prefix}{key}",
             value="",
             placeholder="optional",
             help=get_db_config_tooltip(key) or None,

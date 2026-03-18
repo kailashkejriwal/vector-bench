@@ -229,9 +229,12 @@ class CaseRunner(BaseModel):
                 if TaskStage.SEARCH_SERIAL in self.config.stages:
                     search_results = self._serial_search()
                     m.recall, m.ndcg, m.serial_latency_p99, m.serial_latency_p95 = search_results
-                    m.read_qps = len(self.test_emb) / (m.serial_latency_p99 / 1000) if m.serial_latency_p99 > 0 else 0.0  # Approximate
+                    # serial_latency_p99 is in seconds; only set read_qps from serial when concurrent didn't run
+                    if TaskStage.SEARCH_CONCURRENT not in self.config.stages and m.serial_latency_p99 > 0:
+                        m.read_qps = 1.0 / m.serial_latency_p99  # Approximate: 1 query per p99 second
                     m.read_latency_p99 = m.serial_latency_p99
-                    m.read_throughput = m.read_qps
+                    if TaskStage.SEARCH_CONCURRENT not in self.config.stages:
+                        m.read_throughput = m.read_qps
 
         except Exception as e:
             log.warning(f"Failed to run performance case, reason = {e}")

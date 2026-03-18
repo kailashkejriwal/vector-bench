@@ -124,15 +124,15 @@ def getLabelToShapeMap(data):
 
 
 def drawMetricChart(data, metric, st, key: str, help_text: str = ""):  # noqa: ARG001
-    """Draw a bar chart for the metric if there is chartable data. Returns True if drawn, False if skipped."""
-    dataWithMetric = [d for d in data if _metric_value(d, metric) > 1e-7]
-    if len(dataWithMetric) == 0:
+    """Draw a bar chart for the metric. Include all instances (even with 0) so multi-instance runs show every bar."""
+    if len(data) == 0:
         return False
 
-    # Normalize to display value (handles list-valued metrics) and highest unit (e.g. GB)
+    # Include all instances; use 0 for missing or negligible values so every instance gets a bar
+    sample_val = next((_metric_value(d, metric) for d in data if _metric_value(d, metric) > 1e-7), 0.0)
+    _, display_unit = _to_display_value_and_unit(metric, sample_val or 1.0)
     display_data = []
-    _, display_unit = _to_display_value_and_unit(metric, _metric_value(dataWithMetric[0], metric))
-    for d in dataWithMetric:
+    for d in data:
         raw = _metric_value(d, metric)
         display_val, _ = _to_display_value_and_unit(metric, raw)
         display_data.append({**d, metric: display_val})
@@ -140,15 +140,24 @@ def drawMetricChart(data, metric, st, key: str, help_text: str = ""):  # noqa: A
     if unit and not unit.startswith(" "):
         unit = " " + unit
 
-    # Consistent bar order across all charts: same DB order every time
-    db_order = sorted(set(d.get("db_name", "") for d in display_data))
-    display_data = sorted(display_data, key=lambda d: db_order.index(d.get("db_name", "")) if d.get("db_name") in db_order else 999)
+    # Use bar_display_name for y-axis so each instance has its own bar (e.g. "Clickhouse 1", "Clickhouse 2")
+    for d in display_data:
+        if "bar_display_name" not in d or not d.get("bar_display_name"):
+            d["bar_display_name"] = d.get("db_name", "")
+    # Consistent bar order across all charts: same order every time
+    bar_order = sorted(set(d.get("bar_display_name", "") for d in display_data))
+    display_data = sorted(
+        display_data,
+        key=lambda d: bar_order.index(d.get("bar_display_name", "")) if d.get("bar_display_name") in bar_order else 999,
+    )
 
     chart = st.container()
 
     height = len(display_data) * 24 + 48
     xmin = 0
     xmax = max(d[metric] for d in display_data)
+    if xmax <= xmin:
+        xmax = max(xmin + 1, 1.0)
     xpadding = (xmax - xmin) / 16
     xpadding_multiplier = 1.8
     xrange = [xmin, xmax + xpadding * xpadding_multiplier]
@@ -157,17 +166,16 @@ def drawMetricChart(data, metric, st, key: str, help_text: str = ""):  # noqa: A
     fig = px.bar(
         display_data,
         x=metric,
-        y="db_name",
+        y="bar_display_name",
         color="db",
         height=height,
-        # pattern_shape="db_label",
-        # pattern_shape_sequence=SHAPES,
         pattern_shape_map=labelToShapeMap,
         orientation="h",
         hover_data={
             "db": False,
             "db_label": False,
             "db_name": True,
+            "bar_display_name": True,
         },
         color_discrete_map=COLOR_MAP,
         text_auto=True,
@@ -199,7 +207,7 @@ def drawMetricChart(data, metric, st, key: str, help_text: str = ""):  # noqa: A
         showlegend=False,
         legend=dict(orientation="h", yanchor="bottom", y=1, xanchor="right", x=1, title=""),
         # legend=dict(orientation="v", title=""),
-        yaxis={"categoryorder": "array", "categoryarray": db_order},
+        yaxis={"categoryorder": "array", "categoryarray": bar_order},
         title=dict(
             font=dict(
                 size=16,

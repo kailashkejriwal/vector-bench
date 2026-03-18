@@ -13,10 +13,10 @@ def getshownData(st, results: list[TestResult], filter_type: FilterOp = FilterOp
         unsafe_allow_html=True,
     )
     st.header("Filters")
-    shownResults = getshownResults(st, results, **kwargs)
+    shownResults, selected_labels = getshownResults(st, results, **kwargs)
     showDBNames, showCaseNames = getShowDbsAndCases(st, shownResults, filter_type)
     shownData, failedTasks = getChartData(shownResults, showDBNames, showCaseNames)
-    return shownData, failedTasks, showCaseNames
+    return shownData, failedTasks, showCaseNames, selected_labels
 
 
 def getChartData(

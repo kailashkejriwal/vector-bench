@@ -44,6 +44,7 @@ dependencies = [
     "hdrhistogram>=0.10.1",
     "qdrant-client",
     "weaviate-client",
+    "openpyxl>=3.1.0",
 ]
 dynamic = ["version"]
 
