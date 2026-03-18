@@ -6,11 +6,6 @@ Used by check_results/charts.py to add help text and group metrics under heading
 from vectordb_bench.metric import (
     AVG_CPU_USAGE_METRIC,
     AVG_MEMORY_USAGE_METRIC,
-    CONC_LATENCY_AVG_LIST_METRIC,
-    CONC_LATENCY_P95_LIST_METRIC,
-    CONC_LATENCY_P99_LIST_METRIC,
-    CONC_NUM_LIST_METRIC,
-    CONC_QPS_LIST_METRIC,
     DISK_READ_BYTES_METRIC,
     DISK_WRITE_BYTES_METRIC,
     INSERT_DURATION_METRIC,
@@ -130,26 +125,6 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
         "NDCG (Normalized Discounted Cumulative Gain): Relevance quality of top-k results (0–1). "
         "Higher is better. Measures ranking quality; 1.0 means perfect agreement with ground truth order."
     ),
-    CONC_NUM_LIST_METRIC: (
-        "Concurrency level: Number of concurrent clients used in the load test. "
-        "Shown as the first value in the list when multiple levels were tested."
-    ),
-    CONC_QPS_LIST_METRIC: (
-        "Concurrent QPS: Queries per second achieved under concurrent load (qps). "
-        "Higher is better. Shown as the first value in the list when multiple concurrency levels were tested."
-    ),
-    CONC_LATENCY_AVG_LIST_METRIC: (
-        "Concurrent latency (avg): Average search latency under concurrent load (seconds). "
-        "Lower is better. Shown as the first value when multiple concurrency levels were tested."
-    ),
-    CONC_LATENCY_P95_LIST_METRIC: (
-        "Concurrent latency (p95): 95th percentile search latency under concurrent load (seconds). "
-        "Lower is better. Shown as the first value when multiple concurrency levels were tested."
-    ),
-    CONC_LATENCY_P99_LIST_METRIC: (
-        "Concurrent latency (p99): 99th percentile search latency under concurrent load (seconds). "
-        "Lower is better. Shown as the first value when multiple concurrency levels were tested."
-    ),
 }
 
 # Group heading -> list of metric keys (order within group preserved)
@@ -161,9 +136,7 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
             RECALL_METRIC,
             SERIAL_LATENCY_P99_METRIC,
             SERIAL_LATENCY_P95_METRIC,
-            READ_QPS_METRIC,
             READ_LATENCY_P99_METRIC,
-            READ_THROUGHPUT_METRIC,
         ],
     ),
     (
@@ -197,16 +170,11 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "Concurrency & quality",
+        "Load & quality",
         [
             INSERT_DURATION_METRIC,
             OPTIMIZE_DURATION_METRIC,
             NDCG_METRIC,
-            CONC_NUM_LIST_METRIC,
-            CONC_QPS_LIST_METRIC,
-            CONC_LATENCY_AVG_LIST_METRIC,
-            CONC_LATENCY_P95_LIST_METRIC,
-            CONC_LATENCY_P99_LIST_METRIC,
         ],
     ),
 ]
@@ -217,11 +185,6 @@ RESULTS_METRIC_DISPLAY_NAMES: dict[str, str] = {
     INSERT_DURATION_METRIC: "Insert duration",
     OPTIMIZE_DURATION_METRIC: "Optimize duration",
     NDCG_METRIC: "NDCG",
-    CONC_NUM_LIST_METRIC: "Concurrency level",
-    CONC_QPS_LIST_METRIC: "Concurrent QPS",
-    CONC_LATENCY_AVG_LIST_METRIC: "Concurrent latency (avg)",
-    CONC_LATENCY_P95_LIST_METRIC: "Concurrent latency (p95)",
-    CONC_LATENCY_P99_LIST_METRIC: "Concurrent latency (p99)",
 }
 
 
@@ -261,7 +224,9 @@ def group_metrics_for_display(metrics_set: set[str]) -> list[tuple[str, list[str
             result.append((heading, in_group))
     # Any metric not in any group (e.g. future metrics) -> "Other"
     grouped = {m for _, lst in result for m in lst}
-    other = [m for m in sorted(metrics_set) if m not in grouped]
+    # Don't show read_qps/read_throughput as separate metrics; they duplicate QPS for search benchmarks
+    _redundant_read_metrics = {"read_qps", "read_throughput"}
+    other = [m for m in sorted(metrics_set) if m not in grouped and m not in _redundant_read_metrics]
     if other:
         result.append(("Other", other))
     return result

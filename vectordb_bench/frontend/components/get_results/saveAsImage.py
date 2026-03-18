@@ -62,9 +62,15 @@ def _safe_download_filename(label: str) -> str:
     return safe[:80].strip() or "results"
 
 
-@st.experimental_fragment
-def _excel_download_fragment(container, shown_data, failed_tasks, selected_labels, pageName):
-    """Fragment so clicking Download Excel only reruns this block, keeping blob available."""
+def saveAsExcel(container, results_export_data, pageName="vectordb_bench"):
+    """Offer download of results as a formatted Excel file. Filename: Vector_Bench_<Label>.xlsx"""
+    if len(results_export_data) >= 3:
+        shown_data, failed_tasks, selected_labels = results_export_data[0], results_export_data[1], results_export_data[2]
+    else:
+        shown_data, failed_tasks = results_export_data[0], results_export_data[1]
+        selected_labels = []
+    if not shown_data and not failed_tasks:
+        return
     try:
         excel_bytes = _get_excel_bytes_cached(shown_data, failed_tasks or {})
     except Exception as e:
@@ -81,18 +87,6 @@ def _excel_download_fragment(container, shown_data, failed_tasks, selected_label
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         key=f"download_excel_btn_{pageName}",
     )
-
-
-def saveAsExcel(container, results_export_data, pageName="vectordb_bench"):
-    """Offer download of results as a formatted Excel file. Filename: Vector_Bench_<Label>.xlsx"""
-    if len(results_export_data) >= 3:
-        shown_data, failed_tasks, selected_labels = results_export_data[0], results_export_data[1], results_export_data[2]
-    else:
-        shown_data, failed_tasks = results_export_data[0], results_export_data[1]
-        selected_labels = []
-    if not shown_data and not failed_tasks:
-        return
-    _excel_download_fragment(container, shown_data, failed_tasks, selected_labels or [], pageName)
 
 
 def saveAsImage(container, pageName):

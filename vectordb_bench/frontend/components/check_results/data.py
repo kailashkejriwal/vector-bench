@@ -2,6 +2,15 @@ import re
 from collections import defaultdict
 from dataclasses import asdict
 from vectordb_bench.metric import QPS_METRIC, isLowerIsBetterMetric
+
+# Concurrency metrics are not captured or shown in results
+CONCURRENCY_METRIC_KEYS = frozenset({
+    "conc_num_list",
+    "conc_qps_list",
+    "conc_latency_p99_list",
+    "conc_latency_p95_list",
+    "conc_latency_avg_list",
+})
 from vectordb_bench.models import CaseResult, ResultLabel
 
 # Keys commonly used for index/tuning display
@@ -137,6 +146,17 @@ def mergeTasks(tasks: list[CaseResult]):
             tuning_params = metric_info.get("tuning_params", {})
             bar_display_name = bar_display_name_from_db_name(merge_key, db)
             if label == ResultLabel.NORMAL:
+                # Exclude concurrency metrics from results (not captured or shown)
+                metrics_filtered = {k: v for k, v in metrics.items() if k not in CONCURRENCY_METRIC_KEYS}
+                # Sanitize read_qps/read_throughput: old bug set them to absurd values (e.g. 66M).
+                # They should match qps for search benchmarks; cap to qps when clearly wrong.
+                qps_val = metrics_filtered.get(QPS_METRIC, 0) or 0
+                if isinstance(qps_val, (int, float)) and qps_val >= 0:
+                    for key in ("read_qps", "read_throughput"):
+                        if key in metrics_filtered:
+                            v = metrics_filtered[key]
+                            if isinstance(v, (int, float)) and v > 2 * max(qps_val, 1):
+                                metrics_filtered[key] = qps_val
                 merged_tasks.append(
                     {
                         "db_name": merge_key,
@@ -148,8 +168,8 @@ def mergeTasks(tasks: list[CaseResult]):
                         "filter_rate": filter_rate,
                         "version": version,
                         "case_name": case_name,
-                        "metricsSet": set(metrics.keys()),
-                        **metrics,
+                        "metricsSet": set(metrics_filtered.keys()),
+                        **metrics_filtered,
                     }
                 )
             else:
