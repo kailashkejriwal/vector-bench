@@ -3014,8 +3014,9 @@ CASE_CONFIG_MAP = {
 def get_case_config_inputs(db: DB, case_label: CaseLabel) -> list[CaseConfigInput]:
     if db not in CASE_CONFIG_MAP:
         return []
+    db_map = CASE_CONFIG_MAP[db]
     if case_label == CaseLabel.Load:
-        return CASE_CONFIG_MAP[db][CaseLabel.Load]
-    elif case_label == CaseLabel.Performance or case_label == CaseLabel.Streaming:
-        return CASE_CONFIG_MAP[db][CaseLabel.Performance]
+        return db_map.get(CaseLabel.Load, [])
+    if case_label in (CaseLabel.Performance, CaseLabel.Streaming):
+        return db_map.get(CaseLabel.Performance, [])
     return []
