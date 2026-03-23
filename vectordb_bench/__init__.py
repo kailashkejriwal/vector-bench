@@ -53,6 +53,9 @@ class config:
         pathlib.Path(__file__).parent.joinpath("config-files"),
     )
 
+    # ClickHouse data on NVMe/large disk: set to host path (e.g. /mnt/disks/vectordb_bench/clickhouse_data)
+    CLICKHOUSE_DATA_DIR = env.str("CLICKHOUSE_DATA_DIR", "")
+
     K_DEFAULT = 100  # default return top k nearest neighbors during search
     CUSTOM_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("custom/custom_case.json")
 

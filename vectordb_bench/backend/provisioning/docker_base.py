@@ -115,6 +115,10 @@ class DockerContainerProvisioner(Provisioner):
     def is_available(self) -> bool:
         return docker_available()
 
+    def _get_extra_container_args(self) -> list[str]:
+        """Override in subclasses to add e.g. volume mounts. Default: none."""
+        return []
+
     def _run_container(
         self,
         resource_profile: ResourceProfile,
@@ -122,6 +126,9 @@ class DockerContainerProvisioner(Provisioner):
     ) -> str:
         """Run container with -d, return container ID. Do not use --rm so we can
         capture logs from containers that exit quickly (e.g. crash on startup)."""
+        combined = list(self._get_extra_container_args())
+        if extra_args:
+            combined.extend(extra_args)
         args = [
             "docker",
             "run",
@@ -134,8 +141,8 @@ class DockerContainerProvisioner(Provisioner):
         if self.env:
             for e in self.env:
                 args.extend(["-e", e])
-        if extra_args:
-            args.extend(extra_args)
+        if combined:
+            args.extend(combined)
         args.append(self.image)
         if self.command:
             args.extend(self.command)
