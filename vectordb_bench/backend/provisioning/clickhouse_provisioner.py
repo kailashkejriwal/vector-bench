@@ -1,10 +1,12 @@
 """ClickHouse Docker provisioner."""
 
 import logging
+import pathlib
 import time
 
 from pydantic import SecretStr
 
+from vectordb_bench import config
 from vectordb_bench.backend.clients.clickhouse.config import ClickhouseConfig
 from vectordb_bench.backend.provisioning.base import ConnectionInfo
 from vectordb_bench.backend.provisioning.docker_base import DockerContainerProvisioner
@@ -29,6 +31,16 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
     image = CLICKHOUSE_IMAGE
     container_port = CLICKHOUSE_NATIVE_PORT
     env = [f"CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1", f"CLICKHOUSE_PASSWORD={DEFAULT_PASSWORD}"]
+
+    def _get_extra_container_args(self) -> list[str]:
+        """Mount CLICKHOUSE_DATA_DIR to /var/lib/clickhouse when set (e.g. NVMe disk)."""
+        data_dir = (config.CLICKHOUSE_DATA_DIR or "").strip()
+        if not data_dir:
+            return []
+        path = pathlib.Path(data_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        log.info("ClickHouse: using data dir on host %s (NVMe/large disk)", path)
+        return ["-v", f"{path}:/var/lib/clickhouse"]
 
     def _wait_until_ready(self, host: str, port: int, timeout_sec: int = 600) -> None:
         """Wait for TCP then extra delay so ClickHouse is ready for native protocol."""
