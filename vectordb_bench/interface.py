@@ -1,14 +1,13 @@
 import concurrent.futures
 import logging
 import multiprocessing as mp
+import os
 import pathlib
 import signal
 import traceback
 import uuid
 from collections.abc import Callable
 from multiprocessing.connection import Connection
-
-import psutil
 
 from . import config
 from .backend.assembler import Assembler, FilterNotSupportedError
@@ -258,11 +257,13 @@ class BenchMarkRunner:
                         r.stop()
                     except Exception as e:
                         log.warning("case runner stop failed (%s)", e)
-                try:
+                skip_psutil = (
+                    os.environ.get("VDB_SKIP_PSUTIL", "").lower() in ("1", "true", "yes")
+                    or getattr(config, "VDB_SKIP_PSUTIL", False)
+                )
+                if not skip_psutil:
                     self.kill_proc_tree(timeout=5)
-                except Exception as e:
-                    log.warning("kill_proc_tree failed (%s), continuing", e)
-            except Exception as e:
+            except BaseException as e:
                 log.warning("_clear_running_task cleanup failed (%s), continuing", e)
             finally:
                 self.running_task = None
@@ -307,28 +308,30 @@ class BenchMarkRunner:
         "on_terminate", if specified, is a callback function which is
         called as soon as a child terminates.
         On restricted VMs/containers, psutil may raise PermissionError;
-        we catch all exceptions and skip cleanup to avoid crashing.
-        Set env VDB_SKIP_PSUTIL=1 to skip psutil entirely (for restricted VMs).
+        we skip entirely when VDB_SKIP_PSUTIL=1 or any exception occurs.
         """
-        if getattr(config, "VDB_SKIP_PSUTIL", None):
+        if (
+            os.environ.get("VDB_SKIP_PSUTIL", "").lower() in ("1", "true", "yes")
+            or getattr(config, "VDB_SKIP_PSUTIL", False)
+        ):
+            return
+        try:
+            import psutil
+        except Exception as e:
+            log.warning("psutil import failed (%s), skipping kill_proc_tree", e)
             return
         try:
             children = psutil.Process().children(recursive=True)
-        except Exception as e:
-            log.warning(
-                "Cannot enumerate child processes (%s). Skipping kill_proc_tree. "
-                "This can happen on restricted VMs or containers.",
-                e,
-            )
-            return
-        try:
             for p in children:
                 try:
                     log.warning(f"sending SIGTERM to child process: {p}")
                     p.send_signal(sig)
                 except Exception:
                     pass
-            _, alive = psutil.wait_procs(children, timeout=timeout, callback=on_terminate)
+            try:
+                _, alive = psutil.wait_procs(children, timeout=timeout, callback=on_terminate)
+            except Exception:
+                alive = children
             for p in alive:
                 try:
                     log.warning(f"force killing child process: {p}")
@@ -336,7 +339,10 @@ class BenchMarkRunner:
                 except Exception:
                     pass
         except Exception as e:
-            log.warning("kill_proc_tree failed (%s), skipping", e)
+            log.warning(
+                "kill_proc_tree skipped (%s). Set VDB_SKIP_PSUTIL=1 to avoid this.",
+                e,
+            )
 
 
 benchmark_runner = BenchMarkRunner()
