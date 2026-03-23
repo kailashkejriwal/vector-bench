@@ -38,6 +38,9 @@ class config:
 
     CONCURRENCY_TIMEOUT = 3600
 
+    # Set to truthy (e.g. "1") to skip psutil in kill_proc_tree (for restricted VMs/containers)
+    VDB_SKIP_PSUTIL = env.bool("VDB_SKIP_PSUTIL", False)
+
     RESULTS_LOCAL_DIR = env.path(
         "RESULTS_LOCAL_DIR",
         pathlib.Path(__file__).parent.joinpath("results"),
