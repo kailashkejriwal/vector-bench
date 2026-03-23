@@ -96,8 +96,20 @@ class BenchMarkRunner:
     @staticmethod
     def get_results(result_dir: pathlib.Path | None = None) -> list[TestResult]:
         """results of all runs, each TestResult represents one run."""
-        target_dir = result_dir if result_dir else config.RESULTS_LOCAL_DIR
-        return ResultCollector.collect(target_dir)
+        target_dir = pathlib.Path(result_dir) if result_dir else config.RESULTS_LOCAL_DIR
+        results = ResultCollector.collect(target_dir)
+        if (
+            not results
+            and result_dir is None
+            and config.RESULTS_LOCAL_DIR != config.RESULTS_DEFAULT_DIR
+        ):
+            log.info(
+                "No results in %s; trying fallback %s",
+                target_dir,
+                config.RESULTS_DEFAULT_DIR,
+            )
+            results = ResultCollector.collect(config.RESULTS_DEFAULT_DIR)
+        return results
 
     def _try_get_signal(self):
         while self.receive_conn and self.receive_conn.poll():

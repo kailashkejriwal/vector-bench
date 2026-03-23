@@ -42,10 +42,12 @@ class config:
     # Set VDB_SKIP_PSUTIL=0 to enable process-tree kill on Stop.
     VDB_SKIP_PSUTIL = env.bool("VDB_SKIP_PSUTIL", True)
 
+    _default_results_dir = pathlib.Path(__file__).parent.joinpath("results")
     RESULTS_LOCAL_DIR = env.path(
         "RESULTS_LOCAL_DIR",
-        pathlib.Path(__file__).parent.joinpath("results"),
+        _default_results_dir,
     )
+    RESULTS_DEFAULT_DIR = _default_results_dir  # fallback when configured dir has no results
     CONFIG_LOCAL_DIR = env.path(
         "CONFIG_LOCAL_DIR",
         pathlib.Path(__file__).parent.joinpath("config-files"),
