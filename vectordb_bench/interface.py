@@ -305,22 +305,16 @@ class BenchMarkRunner:
     ):
         """Kill a process tree (including grandchildren) with signal
         "sig" and return a (gone, still_alive) tuple.
-        "on_terminate", if specified, is a callback function which is
-        called as soon as a child terminates.
-        On restricted VMs/containers, psutil may raise PermissionError;
-        we skip entirely when VDB_SKIP_PSUTIL=1 or any exception occurs.
+        On macOS/restricted envs, psutil raises PermissionError - we catch all and skip.
         """
-        if (
-            os.environ.get("VDB_SKIP_PSUTIL", "").lower() in ("1", "true", "yes")
-            or getattr(config, "VDB_SKIP_PSUTIL", False)
-        ):
-            return
         try:
+            if (
+                os.environ.get("VDB_SKIP_PSUTIL", "").lower() in ("1", "true", "yes")
+                or getattr(config, "VDB_SKIP_PSUTIL", False)
+            ):
+                return
             import psutil
-        except Exception as e:
-            log.warning("psutil import failed (%s), skipping kill_proc_tree", e)
-            return
-        try:
+
             children = psutil.Process().children(recursive=True)
             for p in children:
                 try:
@@ -338,11 +332,8 @@ class BenchMarkRunner:
                     p.kill()
                 except Exception:
                     pass
-        except Exception as e:
-            log.warning(
-                "kill_proc_tree skipped (%s). Set VDB_SKIP_PSUTIL=1 to avoid this.",
-                e,
-            )
+        except BaseException as e:
+            log.warning("kill_proc_tree skipped (%s). Set VDB_SKIP_PSUTIL=1 to avoid.", e)
 
 
 benchmark_runner = BenchMarkRunner()
