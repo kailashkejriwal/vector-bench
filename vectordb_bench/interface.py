@@ -252,14 +252,20 @@ class BenchMarkRunner:
 
         if self.running_task:
             log.info(f"will force stop running task: {self.running_task.run_id}")
-            for r in self.running_task.case_runners:
-                r.stop()
-
             try:
-                self.kill_proc_tree(timeout=5)
+                for r in self.running_task.case_runners:
+                    try:
+                        r.stop()
+                    except Exception as e:
+                        log.warning("case runner stop failed (%s)", e)
+                try:
+                    self.kill_proc_tree(timeout=5)
+                except Exception as e:
+                    log.warning("kill_proc_tree failed (%s), continuing", e)
             except Exception as e:
-                log.warning("kill_proc_tree failed (%s), continuing", e)
-            self.running_task = None
+                log.warning("_clear_running_task cleanup failed (%s), continuing", e)
+            finally:
+                self.running_task = None
 
         if self.receive_conn:
             try:
@@ -300,7 +306,12 @@ class BenchMarkRunner:
         "sig" and return a (gone, still_alive) tuple.
         "on_terminate", if specified, is a callback function which is
         called as soon as a child terminates.
+        On restricted VMs/containers, psutil may raise PermissionError;
+        we catch all exceptions and skip cleanup to avoid crashing.
+        Set env VDB_SKIP_PSUTIL=1 to skip psutil entirely (for restricted VMs).
         """
+        if getattr(config, "VDB_SKIP_PSUTIL", None):
+            return
         try:
             children = psutil.Process().children(recursive=True)
         except Exception as e:
@@ -310,23 +321,22 @@ class BenchMarkRunner:
                 e,
             )
             return
-        for p in children:
-            try:
-                log.warning(f"sending SIGTERM to child process: {p}")
-                p.send_signal(sig)
-            except (psutil.NoSuchProcess, PermissionError, OSError):
-                pass
         try:
+            for p in children:
+                try:
+                    log.warning(f"sending SIGTERM to child process: {p}")
+                    p.send_signal(sig)
+                except Exception:
+                    pass
             _, alive = psutil.wait_procs(children, timeout=timeout, callback=on_terminate)
+            for p in alive:
+                try:
+                    log.warning(f"force killing child process: {p}")
+                    p.kill()
+                except Exception:
+                    pass
         except Exception as e:
-            log.warning("wait_procs failed (%s), skipping force kill", e)
-            return
-        for p in alive:
-            try:
-                log.warning(f"force killing child process: {p}")
-                p.kill()
-            except (psutil.NoSuchProcess, PermissionError, OSError):
-                pass
+            log.warning("kill_proc_tree failed (%s), skipping", e)
 
 
 benchmark_runner = BenchMarkRunner()
