@@ -268,10 +268,18 @@ class BenchMarkRunner:
             f"case number: {len(self.running_task.case_runners)}"
         )
         global global_result_future
-        executor = concurrent.futures.ProcessPoolExecutor(
-            max_workers=1,
-            mp_context=mp.get_context("spawn"),
-        )
+        try:
+            executor = concurrent.futures.ProcessPoolExecutor(
+                max_workers=1,
+                mp_context=mp.get_context("spawn"),
+            )
+        except (PermissionError, OSError) as e:
+            log.warning(
+                "ProcessPoolExecutor not available (%s), falling back to ThreadPoolExecutor. "
+                "This can happen on restricted VMs or containers.",
+                e,
+            )
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         global_result_future = executor.submit(self._async_task_v2, self.running_task, conn)
 
         return True
