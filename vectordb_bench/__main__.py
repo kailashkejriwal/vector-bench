@@ -1,7 +1,10 @@
+import sys
 import logging
 import pathlib
 import subprocess
 import traceback
+
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from . import config
 
@@ -21,10 +24,10 @@ def run_streamlit():
         str(streamlit_path),
         "run",
         f"{pathlib.Path(__file__).parent}/frontend/vdbbench.py",
-        "--server.address",
-        "0.0.0.0",
-        "--server.port",
-        "8509",
+	"--server.address",
+	"0.0.0.0",
+	"--server.port",
+	"8501",
         "--logger.level",
         "info",
         "--theme.base",
