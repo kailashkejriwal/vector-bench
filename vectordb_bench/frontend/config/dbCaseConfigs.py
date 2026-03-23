@@ -253,7 +253,6 @@ def generate_custom_streaming_case() -> CaseConfig:
     )
 
 
-# search_stages and concurrencies are now per-instance (in _streaming_scalability_config)
 custom_streaming_config: list[ConfigInput] = [
     ConfigInput(
         label=CaseConfigParamType.dataset_with_size_type,
@@ -266,6 +265,18 @@ custom_streaming_config: list[ConfigInput] = [
         inputType=InputType.Number,
         inputConfig=dict(step=100, min=100, max=4_000, value=200),
         inputHelp="fixed insertion rate (rows/s), must be divisible by 100",
+    ),
+    ConfigInput(
+        label=CaseConfigParamType.search_stages,
+        inputType=InputType.Text,
+        inputConfig=dict(value="[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]"),
+        inputHelp="0<=stage<1.0; do search test when inserting a specified amount of data.",
+    ),
+    ConfigInput(
+        label=CaseConfigParamType.concurrencies,
+        inputType=InputType.Text,
+        inputConfig=dict(value="[5, 10, 20]"),
+        inputHelp="concurrent num of search test while insertion; record max-qps.",
     ),
     ConfigInput(
         label=CaseConfigParamType.optimize_after_write,
@@ -329,25 +340,6 @@ int_filter_rates_config = [
         displayLabel="Int filter rates (e.g. 0.01,0.99)",
     ),
 ]
-
-# Per-instance scalability params (Streaming case) - shown in db_case_config_setting per instance
-_streaming_scalability_config: list[CaseConfigInput] = [
-    CaseConfigInput(
-        label=CaseConfigParamType.search_stages,
-        inputType=InputType.Text,
-        inputConfig=dict(value=getattr(config, "SEARCH_STAGES", "[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]")),
-        inputHelp="0<=stage<1.0; do search test when inserting a specified amount of data.",
-        displayLabel="Search stages",
-    ),
-    CaseConfigInput(
-        label=CaseConfigParamType.concurrencies,
-        inputType=InputType.Text,
-        inputConfig=dict(value=getattr(config, "STREAMING_CONCURRENCIES", "[5, 10, 20]")),
-        inputHelp="Concurrent num of search test while insertion; record max-qps.",
-        displayLabel="Concurrencies",
-    ),
-]
-
 
 UI_CASE_CLUSTERS: list[UICaseItemCluster] = [
     UICaseItemCluster(
@@ -3163,9 +3155,6 @@ def get_case_config_inputs(db: DB, case_label: CaseLabel) -> list[CaseConfigInpu
     db_map = CASE_CONFIG_MAP[db]
     if case_label == CaseLabel.Load:
         return db_map.get(CaseLabel.Load, [])
-    if case_label == CaseLabel.Performance:
+    if case_label in (CaseLabel.Performance, CaseLabel.Streaming):
         return db_map.get(CaseLabel.Performance, [])
-    if case_label == CaseLabel.Streaming:
-        base = db_map.get(CaseLabel.Streaming, db_map.get(CaseLabel.Performance, []))
-        return base + _streaming_scalability_config
     return []

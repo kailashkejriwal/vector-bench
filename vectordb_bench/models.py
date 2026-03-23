@@ -164,10 +164,6 @@ class CaseConfigParamType(Enum):
     dynamic_ef_max = "dynamicEfMax"
     search_stages = "search_stages"
     concurrencies = "concurrencies"
-    # Performance concurrency (per instance)
-    num_concurrency = "num_concurrency"
-    concurrency_duration = "concurrency_duration"
-    concurrency_timeout = "concurrency_timeout"
     optimize_after_write = "optimize_after_write"
     read_dur_after_write = "read_dur_after_write"
 

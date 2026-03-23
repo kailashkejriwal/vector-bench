@@ -125,8 +125,11 @@ class BenchMarkRunner:
 
     def has_running(self) -> bool:
         """check if there're running benchmarks"""
-        if self.running_task:
-            self._try_get_signal()
+        try:
+            if self.running_task:
+                self._try_get_signal()
+        except Exception as e:
+            log.warning("has_running/_try_get_signal failed (%s)", e)
         return self.running_task is not None
 
     def stop_running(self):
@@ -252,7 +255,10 @@ class BenchMarkRunner:
             for r in self.running_task.case_runners:
                 r.stop()
 
-            self.kill_proc_tree(timeout=5)
+            try:
+                self.kill_proc_tree(timeout=5)
+            except Exception as e:
+                log.warning("kill_proc_tree failed (%s), continuing", e)
             self.running_task = None
 
         if self.receive_conn:
@@ -273,7 +279,7 @@ class BenchMarkRunner:
                 max_workers=1,
                 mp_context=mp.get_context("spawn"),
             )
-        except (PermissionError, OSError) as e:
+        except Exception as e:
             log.warning(
                 "ProcessPoolExecutor not available (%s), falling back to ThreadPoolExecutor. "
                 "This can happen on restricted VMs or containers.",
@@ -295,18 +301,32 @@ class BenchMarkRunner:
         "on_terminate", if specified, is a callback function which is
         called as soon as a child terminates.
         """
-        children = psutil.Process().children(recursive=True)
+        try:
+            children = psutil.Process().children(recursive=True)
+        except Exception as e:
+            log.warning(
+                "Cannot enumerate child processes (%s). Skipping kill_proc_tree. "
+                "This can happen on restricted VMs or containers.",
+                e,
+            )
+            return
         for p in children:
             try:
                 log.warning(f"sending SIGTERM to child process: {p}")
                 p.send_signal(sig)
-            except psutil.NoSuchProcess:
+            except (psutil.NoSuchProcess, PermissionError, OSError):
                 pass
-        _, alive = psutil.wait_procs(children, timeout=timeout, callback=on_terminate)
-
+        try:
+            _, alive = psutil.wait_procs(children, timeout=timeout, callback=on_terminate)
+        except Exception as e:
+            log.warning("wait_procs failed (%s), skipping force kill", e)
+            return
         for p in alive:
-            log.warning(f"force killing child process: {p}")
-            p.kill()
+            try:
+                log.warning(f"force killing child process: {p}")
+                p.kill()
+            except (psutil.NoSuchProcess, PermissionError, OSError):
+                pass
 
 
 benchmark_runner = BenchMarkRunner()
