@@ -27,7 +27,7 @@ def run_streamlit():
 	"--server.address",
 	"0.0.0.0",
 	"--server.port",
-	"8501",
+	"8502",
         "--logger.level",
         "info",
         "--theme.base",
