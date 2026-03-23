@@ -23,7 +23,7 @@ def getshownData(st, results: list[TestResult], filter_type: FilterOp = FilterOp
     st.header("Filters")
 
     shownResults, selected_labels = getshownResults(st, results, **kwargs)
-    showDBNames, showCaseNames = getShowDbsAndCases(st, shownResults, filter_type)
+    showDBNames, showCaseNames = getShowDbsAndCases(st, shownResults, filter_type, key_prefix="")
 
     shownData, failedTasks = getChartData(shownResults, showDBNames, showCaseNames)
 
@@ -61,7 +61,7 @@ def getshownResults(
     return selectedResult, list(selectedResultSelectedOptions)
 
 
-def getShowDbsAndCases(st, result: list[CaseResult], filter_type: FilterOp) -> tuple[list[str], list[str]]:
+def getShowDbsAndCases(st, result: list[CaseResult], filter_type: FilterOp, key_prefix: str = "", use_expander: bool = True) -> tuple[list[str], list[str]]:
     initSidebarExanderStyle(st)
     case_results = [res for res in result if res.task_config.case_config.case.filters.type == filter_type]
     allDbNames = list(set({res.task_config.db_name for res in case_results}))
@@ -75,6 +75,8 @@ def getShowDbsAndCases(st, result: list[CaseResult], filter_type: FilterOp) -> t
         "DB Filter",
         allDbNames,
         col=1,
+        key_prefix=key_prefix,
+        use_expander=use_expander,
     )
     showCaseNames = []
 
@@ -91,6 +93,8 @@ def getShowDbsAndCases(st, result: list[CaseResult], filter_type: FilterOp) -> t
             "Case Filter",
             [caseName for caseName in allCaseNames],
             col=1,
+            key_prefix=key_prefix,
+            use_expander=use_expander,
         )
 
     if filter_type == FilterOp.StrEqual or filter_type == FilterOp.NumGE:
@@ -102,6 +106,8 @@ def getShowDbsAndCases(st, result: list[CaseResult], filter_type: FilterOp) -> t
             datasetWithSizeTypes,
             col=1,
             optionLables=[v.value for v in datasetWithSizeTypes],
+            key_prefix=key_prefix,
+            use_expander=use_expander,
         )
         datasets = [dataset_with_size_type.get_manager() for dataset_with_size_type in showDatasetWithSizeTypes]
         showCaseNames = list(set([case.name for case in allCases if case.dataset in datasets]))
@@ -109,25 +115,59 @@ def getShowDbsAndCases(st, result: list[CaseResult], filter_type: FilterOp) -> t
     return showDBNames, showCaseNames
 
 
-def filterView(container, header, options, col, optionLables=None):
-    selectAllState = f"{header}-select-all-state"
+def getSectionData(
+    st,
+    case_results: list[CaseResult],
+    filter_type: FilterOp,
+    key_prefix: str,
+    use_expander: bool = True,
+) -> tuple[list, dict, list[str]]:
+    """Get shownData, failedTasks, showCaseNames for a section given case_results and filter_type."""
+    showDBNames, showCaseNames = getShowDbsAndCases(st, case_results, filter_type, key_prefix=key_prefix, use_expander=use_expander)
+    shownData, failedTasks = getChartData(case_results, showDBNames, showCaseNames)
+    return shownData, failedTasks, showCaseNames
+
+
+def getSectionDataMinimal(
+    case_results: list[CaseResult],
+    filter_type: FilterOp,
+) -> tuple[list, dict, list[str]]:
+    """Get shownData, failedTasks, showCaseNames with all filters defaulting to selected (no UI)."""
+    filtered = [r for r in case_results if r.task_config.case_config.case.filters.type == filter_type]
+    allDbNames = sorted(set(r.task_config.db_name for r in filtered))
+    if filter_type == FilterOp.NonFilter:
+        allCaseNames = sorted(set(r.task_config.case_config.case.name for r in filtered))
+    else:
+        allCaseNames = sorted(set(r.task_config.case_config.case.name for r in filtered))
+    shownData, failedTasks = getChartData(filtered, allDbNames, allCaseNames)
+    return shownData, failedTasks, allCaseNames
+
+
+def filterView(container, header, options, col, optionLables=None, key_prefix: str = "", use_expander: bool = True):
+    """use_expander=False when inside another expander to avoid Streamlit's nested-expander restriction."""
+    prefix = f"{key_prefix}-" if key_prefix else ""
+    selectAllState = f"{prefix}{header}-select-all-state"
     if selectAllState not in st.session_state:
         st.session_state[selectAllState] = True
 
-    countKeyState = f"{header}-select-all-count-key"
+    countKeyState = f"{prefix}{header}-select-all-count-key"
     if countKeyState not in st.session_state:
         st.session_state[countKeyState] = 0
 
-    expander = container.expander(header, True)
-    selectAllColumns = expander.columns(SIDEBAR_CONTROL_COLUMNS, gap="small")
+    if use_expander:
+        inner = container.expander(header, True)
+    else:
+        inner = container.container()
+        inner.markdown(f"**{header}**")
+    selectAllColumns = inner.columns(SIDEBAR_CONTROL_COLUMNS, gap="small")
     selectAllButton = selectAllColumns[SIDEBAR_CONTROL_COLUMNS - 2].button(
         "select all",
-        key=f"{header}-select-all-button",
+        key=f"{prefix}{header}-select-all-button",
         # type="primary",
     )
     clearAllButton = selectAllColumns[SIDEBAR_CONTROL_COLUMNS - 1].button(
         "clear all",
-        key=f"{header}-clear-all-button",
+        key=f"{prefix}{header}-clear-all-button",
         # type="primary",
     )
     if selectAllButton:
@@ -136,7 +176,7 @@ def filterView(container, header, options, col, optionLables=None):
     if clearAllButton:
         st.session_state[selectAllState] = False
         st.session_state[countKeyState] += 1
-    columns = expander.columns(
+    columns = inner.columns(
         col,
         gap="small",
     )
@@ -147,7 +187,7 @@ def filterView(container, header, options, col, optionLables=None):
         isActive[option] = columns[i % col].checkbox(
             optionLables[i],
             value=isActive[option],
-            key=f"{optionLables[i]}-{st.session_state[countKeyState]}",
+            key=f"{prefix}{optionLables[i]}-{st.session_state[countKeyState]}",
         )
 
     return [options[i] for i, option in enumerate(optionLables) if isActive[option]]

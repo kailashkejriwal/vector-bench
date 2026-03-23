@@ -167,6 +167,7 @@ def _write_glossary_sheet(wb) -> None:
 def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
     """
     Build a formatted Excel workbook from the same data shown on the results page.
+    Supports unified results with multiple benchmark types (Standard, Int Filter, Label Filter).
     Returns the file as bytes for use with st.download_button.
     """
     with warnings.catch_warnings():
@@ -179,7 +180,14 @@ def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
         row = 1
         db_tuning = get_databases_and_tuning(shown_data)
         counts = get_query_run_counts(shown_data)
+        benchmark_types = sorted(set(d.get("benchmark_type", "Standard Performance") for d in shown_data))
 
+        if len(benchmark_types) > 1:
+            ws_summary.cell(row=row, column=1, value="Benchmark types in this export")
+            ws_summary.cell(row=row, column=1).font = Font(bold=True)
+            row += 1
+            ws_summary.cell(row=row, column=1, value=", ".join(benchmark_types))
+            row += 2
         ws_summary.cell(row=row, column=1, value="Databases in this run")
         ws_summary.cell(row=row, column=1).font = Font(bold=True)
         row += 1
@@ -254,20 +262,28 @@ def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
         for col in range(1, 20):
             ws_summary.column_dimensions[get_column_letter(col)].width = 18
 
-        # --- One sheet per case (unique titles, max 31 chars each) ---
-        case_names = list(OrderedDict.fromkeys(d["case_name"] for d in shown_data))
+        # --- One sheet per (benchmark_type, case_name) when benchmark_type varies; else per case_name ---
+        case_keys = list(
+            OrderedDict.fromkeys(
+                (d.get("benchmark_type", "Standard Performance"), d["case_name"]) for d in shown_data
+            )
+        )
         used_titles = set()
-        for idx, case_name in enumerate(case_names):
-            base = _sheet_title(case_name, "Case")
+        for idx, (benchmark_type, case_name) in enumerate(case_keys):
+            base = _sheet_title(f"{benchmark_type} | {case_name}", "Case") if len(benchmark_types) > 1 else _sheet_title(case_name, "Case")
             title = base
             n = 1
             while title in used_titles:
                 suffix = f"_{n}"
-                title = _sheet_title(case_name, "Case")[: (EXCEL_SHEET_TITLE_MAX_LEN - len(suffix))] + suffix
+                title = (base[: (EXCEL_SHEET_TITLE_MAX_LEN - len(suffix))] + suffix) if len(base) + len(suffix) > EXCEL_SHEET_TITLE_MAX_LEN else base + suffix
                 n += 1
             used_titles.add(title)
             ws = wb.create_sheet(title, idx + 1)
-            case_data = [d for d in shown_data if d["case_name"] == case_name]
+            case_data = [
+                d
+                for d in shown_data
+                if d["case_name"] == case_name and d.get("benchmark_type", "Standard Performance") == benchmark_type
+            ]
             if not case_data:
                 continue
             metrics_set = set()
@@ -282,6 +298,14 @@ def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
                 "Name of the database instance that produced this result (e.g. Clickhouse 1, Milvus 2).",
             )
             col += 1
+            if len(benchmark_types) > 1:
+                ws.cell(row=1, column=col, value="Benchmark Type")
+                _style_header(ws.cell(row=1, column=col))
+                _set_cell_comment(
+                    ws.cell(row=1, column=col),
+                    "Section from the Results page: Standard Performance, Int Filter, or Label Filter.",
+                )
+                col += 1
             for group_heading, metrics_in_group in grouped:
                 for metric in metrics_in_group:
                     if any(_metric_value(d, metric) != "" for d in case_data):
@@ -296,9 +320,14 @@ def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
                             _set_cell_comment(ws.cell(row=1, column=col), desc)
                         col += 1
             for r, d in enumerate(case_data, start=2):
-                ws.cell(row=r, column=1, value=d.get("bar_display_name") or d.get("db_name", ""))
-                _style_cell(ws.cell(row=r, column=1))
-                c = 2
+                c = 1
+                ws.cell(row=r, column=c, value=d.get("bar_display_name") or d.get("db_name", ""))
+                _style_cell(ws.cell(row=r, column=c))
+                c += 1
+                if len(benchmark_types) > 1:
+                    ws.cell(row=r, column=c, value=d.get("benchmark_type", ""))
+                    _style_cell(ws.cell(row=r, column=c))
+                    c += 1
                 for _group_heading, metrics_in_group in grouped:
                     for metric in metrics_in_group:
                         if any(_metric_value(x, metric) != "" for x in case_data):

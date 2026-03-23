@@ -6,10 +6,15 @@ import plotly.express as px
 from vectordb_bench.frontend.config.styles import COLOR_MAP
 
 
-def drawChartsByCase(allData, showCaseNames: list[str], st, latency_type: str):
+def drawChartsByCase(allData, showCaseNames: list[str], st, latency_type: str, use_expander: bool = True):
+    """use_expander=False when inside another expander to avoid Streamlit's nested-expander restriction."""
     initMainExpanderStyle(st)
     for caseName in showCaseNames:
-        chartContainer = st.expander(caseName, True)
+        if use_expander:
+            chartContainer = st.expander(caseName, True)
+        else:
+            chartContainer = st.container()
+            chartContainer.markdown(f"**{caseName}**")
         caseDataList = [data for data in allData if data["case_name"] == caseName]
         data = [
             {

@@ -9,10 +9,15 @@ import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
 
-def drawCharts(st, allData, caseNames: list[str]):
+def drawCharts(st, allData, caseNames: list[str], use_expander: bool = True):
+    """use_expander=False when inside another expander to avoid Streamlit's nested-expander restriction."""
     initMainExpanderStyle(st)
     for caseName in caseNames:
-        chartContainer = st.expander(caseName, True)
+        if use_expander:
+            chartContainer = st.expander(caseName, True)
+        else:
+            chartContainer = st.container()
+            chartContainer.markdown(f"**{caseName}**")
         data = [data for data in allData if data["case_name"] == caseName]
         drawChart(data, chartContainer, key_prefix=caseName)
 

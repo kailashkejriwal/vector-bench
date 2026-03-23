@@ -38,14 +38,20 @@ def get_databases_and_tuning(shown_data: list[dict]) -> OrderedDict[str, dict]:
     return seen
 
 
-def draw_results_summary(st, shown_data: list[dict], failed_tasks: dict, show_case_names: list[str]):
-    """Render summary: databases in the run, tuning per database, and query run counts."""
+def draw_results_summary(st, shown_data: list[dict], failed_tasks: dict, show_case_names: list[str], use_expander: bool = True):
+    """Render summary: databases in the run, tuning per database, and query run counts.
+    use_expander=False when inside another expander to avoid Streamlit's nested-expander restriction."""
     if not shown_data and not failed_tasks:
         return
     counts = get_query_run_counts(shown_data)
     db_tuning = get_databases_and_tuning(shown_data)
 
-    with st.expander("Summary", expanded=True):
+    if use_expander:
+        outer = st.expander("Summary", expanded=True)
+    else:
+        outer = st.container()
+        outer.markdown("**Summary**")
+    with outer:
         if db_tuning:
             st.markdown("**Databases in this run**")
             st.markdown(", ".join(db_tuning.keys()))

@@ -6,7 +6,8 @@ import streamlit as st
 from vectordb_bench.frontend.config.dbPrices import DB_DBLABEL_TO_PRICE
 
 
-def priceTable(container, data):
+def priceTable(container, data, use_expander: bool = True):
+    """use_expander=False when inside another expander to avoid Streamlit's nested-expander restriction."""
     dbAndLabelSet = {(d["db"], d["db_label"]) for d in data if d["db"] != DB.Milvus.value}
 
     dbAndLabelList = list(dbAndLabelSet)
@@ -24,8 +25,12 @@ def priceTable(container, data):
     )
     height = len(table) * 35 + 38
 
-    expander = container.expander("Price List (Editable).")
-    editTable = expander.data_editor(
+    if use_expander:
+        inner = container.expander("Price List (Editable).")
+    else:
+        inner = container.container()
+        inner.markdown("**Price List (Editable)**")
+    editTable = inner.data_editor(
         table,
         use_container_width=True,
         hide_index=True,

@@ -33,7 +33,7 @@ The test is actually divided into 3 sub-processes
 - **3.3 Test Part 3 - Concurrent Search Test**
     - (1) Create multiple processes, each perform serial searches independently to test the database's **maximum throughput(max-qps)**.
     - (2) Since different databases may reach peak throughput under different conditions, we conduct multiple test rounds. The number of processes **starts at 1 by default and gradually increases up to 80**, with each test group running for **30 seconds**.
-        - Detailed latency and QPS metrics at different concurrency levels can be viewed on the <a href="concurrent" target="_self" style="text-decoration: none;">*concurrent*</a> page.
+        - Detailed latency and QPS metrics at different concurrency levels can be viewed in the <a href="results" target="_self" style="text-decoration: none;">*Results*</a> page under the Concurrent Performance section.
         - The highest recorded QPS value from these tests will be selected as the final max-qps.
 """,
         unsafe_allow_html=True,

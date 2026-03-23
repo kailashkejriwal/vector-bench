@@ -70,55 +70,57 @@ def welcomePrams(st):
                 "</span>"
             ),
             "image": "fig/homepage/qp$.png",
-            "link": "quries_per_dollar",
+            "link": "results",
         },
         {
             "title": "Tables",
             "description": (
-                "<span style='font-size: 17px;'>" "To view the results of differnt datasets in tables." "</span>"
+                "<span style='font-size: 17px;'>"
+                "To view the results of different datasets in tables (Results page, Tables section)."
+                "</span>"
             ),
             "image": "fig/homepage/table.png",
-            "link": "tables",
+            "link": "results",
         },
         {
             "title": "Concurrent Performance",
             "description": (
                 "<span style='font-size: 17px;'>"
-                "To view the variation of qps with latency under different concurrent."
+                "To view the variation of qps with latency under different concurrency (Results page)."
                 "</span>"
             ),
             "image": "fig/homepage/concurrent.png",
-            "link": "concurrent",
+            "link": "results",
         },
         {
             "title": "Label Filter Performance",
             "description": (
                 "<span style='font-size: 17px;'>"
-                "To view the perfomance of datasets under different label filter ratios "
+                "To view the performance of datasets under different label filter ratios (Results page)."
                 "</span>"
             ),
             "image": "fig/homepage/label_filter.png",
-            "link": "label_filter",
+            "link": "results",
         },
         {
             "title": "Int Filter Performance",
             "description": (
                 "<span style='font-size: 17px;'>"
-                "To view the perfomance of datasets under different int filter ratios "
+                "To view the performance of datasets under different int filter ratios (Results page)."
                 "</span>"
             ),
             "image": "fig/homepage/label_filter.png",
-            "link": "int_filter",
+            "link": "results",
         },
         {
             "title": "Streaming Performance",
             "description": (
                 "<span style='font-size: 17px;'>"
-                "To view the perfomance of datasets under different search stages and insertion rates. "
+                "To view the performance of datasets under different search stages and insertion rates (Results page)."
                 "</span>"
             ),
             "image": "fig/homepage/streaming.png",
-            "link": "streaming",
+            "link": "results",
         },
         {
             "title": "Run Test",
