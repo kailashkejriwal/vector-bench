@@ -1,5 +1,3 @@
-import json
-
 from vectordb_bench.backend.cases import CaseLabel, CaseType
 from vectordb_bench.backend.clients import DB
 from vectordb_bench.backend.provisioning.base import InstanceConfig
@@ -33,32 +31,6 @@ def _expanded_instances(actived_db_list: list[DB], instance_count: dict[DB, int]
             yield db, instance_idx
 
 
-# Param keys for case-level config (not passed to DBCaseConfig)
-_CASE_LEVEL_KEYS = frozenset({"search_stages", "concurrencies"})
-
-
-def _build_case_config_for_task(case: CaseConfig, cfg: dict, case_label: CaseLabel) -> CaseConfig:
-    """Build a case_config copy with per-instance scalability params from cfg (Streaming only)."""
-    case_config = case.copy(deep=True)
-    if case_label == CaseLabel.Streaming:
-        search_stages = cfg.get("search_stages")
-        concurrencies = cfg.get("concurrencies")
-        custom = dict(case_config.custom_case or {})
-        if search_stages is not None:
-            try:
-                custom["search_stages"] = json.loads(search_stages) if isinstance(search_stages, str) else search_stages
-            except (json.JSONDecodeError, TypeError):
-                pass
-        if concurrencies is not None:
-            try:
-                custom["concurrencies"] = json.loads(concurrencies) if isinstance(concurrencies, str) else concurrencies
-            except (json.JSONDecodeError, TypeError):
-                pass
-        if custom != (case_config.custom_case or {}):
-            case_config.custom_case = custom
-    return case_config
-
-
 def generate_tasks(
     actived_db_list: list[DB],
     db_configs: dict,
@@ -82,21 +54,17 @@ def generate_tasks(
         if instance_count.get(db, 1) > 1 and not (getattr(db_config, "db_label", None) or "").strip():
             db_config = db_config.copy(update={"db_label": f"instance-{instance_idx + 1}"})
         for case in actived_case_list:
-            case_label = _case_label_for_type(case.case_id)
             cfg = {key.value: value for key, value in all_case_configs[key][case].items()}
             # Many DBCaseConfig models require an `index` field, while the UI stores the selection under `IndexType`.
             if CaseConfigParamType.IndexType in all_case_configs[key][case] and "index" not in cfg:
                 cfg["index"] = all_case_configs[key][case][CaseConfigParamType.IndexType]
             _fill_default_case_params(db, case, cfg)
-            # Exclude case-level params from DBCaseConfig; build case_config with per-instance values
-            cfg_for_db = {k: v for k, v in cfg.items() if k not in _CASE_LEVEL_KEYS}
-            case_config = _build_case_config_for_task(case, cfg, case_label)
             task = TaskConfig(
                 db=db.value,
                 db_config=db_config,
-                case_config=case_config,
+                case_config=case,
                 db_case_config=db.case_config_cls(all_case_configs[key][case].get(CaseConfigParamType.IndexType, None))(
-                    **cfg_for_db
+                    **cfg
                 ),
                 auto_start=auto_start,
                 instance_config=InstanceConfig(**instance_config) if instance_config and isinstance(instance_config, dict) else None,

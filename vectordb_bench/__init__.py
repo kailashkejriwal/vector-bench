@@ -33,12 +33,10 @@ class config:
     USE_SHUFFLED_DATA = env.bool("USE_SHUFFLED_DATA", True)
 
     NUM_CONCURRENCY = env.list("NUM_CONCURRENCY", [1, 5, 10, 20, 30, 40, 60, 80], subcast=int)
-    CONCURRENCY_DURATION = env.int("CONCURRENCY_DURATION", 30)
-    CONCURRENCY_TIMEOUT = env.int("CONCURRENCY_TIMEOUT", 3600)
 
-    # Streaming scalability: default search stages (JSON array) and concurrencies (JSON array)
-    SEARCH_STAGES = env.str("SEARCH_STAGES", "[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]")
-    STREAMING_CONCURRENCIES = env.str("STREAMING_CONCURRENCIES", "[5, 10, 20]")
+    CONCURRENCY_DURATION = 30
+
+    CONCURRENCY_TIMEOUT = 3600
 
     RESULTS_LOCAL_DIR = env.path(
         "RESULTS_LOCAL_DIR",
