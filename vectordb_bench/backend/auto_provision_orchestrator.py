@@ -111,6 +111,17 @@ def run_with_auto_provision(
         instance_config: InstanceConfig | None = getattr(
             runners[0].config, "instance_config", None
         )
+        leave_running_after = (
+            getattr(instance_config, "leave_container_running", False)
+            if instance_config
+            else False
+        )
+        log.info(
+            "Auto-provision %s: leave_container_running=%s (container will %s after run)",
+            db.name,
+            leave_running_after,
+            "stay up" if leave_running_after else "be torn down",
+        )
         data_size = runners[0].ca.dataset.data.size
         dim = runners[0].ca.dataset.data.dim
         resource_profile = get_resource_profile(data_size, dim, instance_config)
@@ -145,8 +156,14 @@ def run_with_auto_provision(
                 )
                 results.append(case_res)
         finally:
+            leave_running = leave_running_after
             try:
-                provisioner.teardown()
+                if leave_running:
+                    log.info(
+                        "Skipping teardown for %s (leave_container_running=True). Container left running for post-benchmark analysis.",
+                        db.name,
+                    )
+                provisioner.teardown(leave_running=leave_running)
             except Exception as e:
                 log.warning(f"Teardown failed for {db}: {e}")
 

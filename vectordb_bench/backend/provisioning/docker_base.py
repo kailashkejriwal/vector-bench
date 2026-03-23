@@ -203,8 +203,15 @@ class DockerContainerProvisioner(Provisioner):
         """Subclass must return ConnectionInfo with host/port etc."""
         raise NotImplementedError
 
-    def teardown(self) -> None:
+    def teardown(self, leave_running: bool = False) -> None:
         if not self.container_id:
+            return
+        if leave_running:
+            log.info(
+                "Container left running (leave_container_running=True). id=%s — interact with it: docker exec -it %s <shell>",
+                self.container_id[:12],
+                self.container_id[:12],
+            )
             return
         try:
             log.info("Teardown: stopping and removing container id=%s", self.container_id[:12] if self.container_id else None)

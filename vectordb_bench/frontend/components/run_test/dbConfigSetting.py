@@ -81,10 +81,19 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
         else "Auto-provisioning is not available for this database yet.",
     )
     if auto_start:
-        st.caption("Instance will be started with Docker and shut down after benchmarking.")
         # Use a container instead of expander (Streamlit does not allow expanders inside expanders)
         instance_container = st.container()
         with instance_container:
+            leave_container_running = st.checkbox(
+                "Leave container running after benchmark",
+                key=f"{key_prefix}leave-container-running",
+                help="Do not stop/remove the container when the run finishes so you can analyze data or run queries (e.g. docker exec -it <container> ...)",
+            )
+            st.caption(
+                "Instance will be started with Docker and shut down after benchmarking."
+                if not leave_container_running
+                else "Instance will be started with Docker and left running after the run for post-benchmark analysis."
+            )
             st.markdown("Instance config (optional)")
             use_custom = st.radio(
                 "Config",
@@ -127,7 +136,10 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     "manifest_yaml": manifest_yaml.strip() if manifest_yaml else None,
                     "manifest_format": "kubernetes" if manifest_yaml and "apiVersion:" in (manifest_yaml or "") else "docker_compose",
                     "resource_overrides": overrides if overrides else None,
+                    "leave_container_running": leave_container_running,
                 }
+            else:
+                instance_config = {"leave_container_running": leave_container_running}
 
     placeholder = get_placeholder_config(activeDb) if auto_start else None
     dbConfigClass = activeDb.config_cls

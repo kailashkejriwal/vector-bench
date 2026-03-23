@@ -247,7 +247,10 @@ class KubernetesContainerProvisioner(Provisioner):
         """Subclass must return ConnectionInfo with host/port etc."""
         raise NotImplementedError
 
-    def teardown(self) -> None:
+    def teardown(self, leave_running: bool = False) -> None:
+        if leave_running:
+            log.info("Leave running requested: skipping teardown (namespace=%s, app=%s)", self.namespace, self.name)
+            return
         if self._port_forward_process is not None:
             try:
                 log.info("Teardown: stopping port-forward")

@@ -24,6 +24,7 @@ class InstanceConfig(BaseModel):
     manifest_yaml: str | None = None
     manifest_format: str | None = None  # "kubernetes" | "docker_compose"
     resource_overrides: dict[str, Any] | None = None  # e.g. {"cpu": "4", "memory": "8Gi"}
+    leave_container_running: bool = False  # skip teardown so you can analyze/interact with the container after the run
 
 
 class Provisioner(ABC):
@@ -40,8 +41,8 @@ class Provisioner(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def teardown(self) -> None:
-        """Stop and remove the instance."""
+    def teardown(self, leave_running: bool = False) -> None:
+        """Stop and remove the instance. If leave_running=True, do nothing (container stays up for analysis)."""
         raise NotImplementedError
 
     def is_available(self) -> bool:
