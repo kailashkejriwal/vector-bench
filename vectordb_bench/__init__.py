@@ -38,8 +38,9 @@ class config:
 
     CONCURRENCY_TIMEOUT = 3600
 
-    # Set to truthy (e.g. "1") to skip psutil in kill_proc_tree (for restricted VMs/containers)
-    VDB_SKIP_PSUTIL = env.bool("VDB_SKIP_PSUTIL", False)
+    # Skip psutil in kill_proc_tree. Default True to avoid PermissionError on macOS/restricted VMs.
+    # Set VDB_SKIP_PSUTIL=0 to enable process-tree kill on Stop.
+    VDB_SKIP_PSUTIL = env.bool("VDB_SKIP_PSUTIL", True)
 
     RESULTS_LOCAL_DIR = env.path(
         "RESULTS_LOCAL_DIR",
