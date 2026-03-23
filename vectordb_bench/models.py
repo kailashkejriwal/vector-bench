@@ -150,9 +150,24 @@ class CaseConfigParamType(Enum):
 
     dataset_with_size_type = "dataset_with_size_type"
     filter_rate = "filter_rate"
+    label_percentages = "label_percentages"
+    filter_rates = "filter_rates"
     insert_rate = "insert_rate"
+    # ClickHouse HNSW optimization
+    quantization = "quantization"
+    granularity = "granularity"
+    # Qdrant optimization (on_disk exists above)
+    hnsw_ef = "hnsw_ef"
+    # Weaviate HNSW optimization (dynamic ef when ef=-1)
+    dynamic_ef_factor = "dynamicEfFactor"
+    dynamic_ef_min = "dynamicEfMin"
+    dynamic_ef_max = "dynamicEfMax"
     search_stages = "search_stages"
     concurrencies = "concurrencies"
+    # Performance concurrency (per instance)
+    num_concurrency = "num_concurrency"
+    concurrency_duration = "concurrency_duration"
+    concurrency_timeout = "concurrency_timeout"
     optimize_after_write = "optimize_after_write"
     read_dur_after_write = "read_dur_after_write"
 

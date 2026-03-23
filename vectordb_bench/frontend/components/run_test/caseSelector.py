@@ -65,10 +65,23 @@ def caseSelector(st, actived_db_list: list[DB], instance_count: dict[DB, int] | 
 def case_cluster_expander(st, case_cluster: UICaseItemCluster, db_to_case_cluster_configs, actived_db_list: list[DB], instance_count: dict[DB, int], expanded: list[tuple[DB, int]]):
     expander = st.expander(case_cluster.label, False)
     actived_cases: list[CaseConfig] = []
+    cluster_config = {}
+    if case_cluster.cluster_level_config_inputs:
+        expander.markdown("**Filter distributions** — choose which percentages/rates to run (reduces resource use):")
+        cols = expander.columns(len(case_cluster.cluster_level_config_inputs))
+        for i, config_input in enumerate(case_cluster.cluster_level_config_inputs):
+            key = f"cluster-config-{case_cluster.label}-{config_input.label.value}"
+            rich_help = get_case_param_tooltip(config_input.label.value, config_input.inputHelp)
+            config_with_help = config_input.copy(update={"inputHelp": rich_help})
+            cluster_config[config_input.label.value] = inputWidget(
+                cols[i], config=config_with_help, key=key
+            )
+        expander.markdown("---")
     for ui_case_item in case_cluster.uiCaseItems:
         if ui_case_item.isLine:
             addHorizontalLine(expander)
         else:
+            ui_case_item.tmp_custom_config.update(cluster_config)
             actived_cases += case_item_checkbox(
                 expander, db_to_case_cluster_configs, ui_case_item, expanded, instance_count=instance_count
             )

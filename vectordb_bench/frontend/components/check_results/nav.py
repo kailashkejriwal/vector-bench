@@ -26,6 +26,7 @@ def NavToPages(st):
     options = [
         {"name": "Run Test", "link": "run_test"},
         {"name": "Results", "link": "results"},
+        {"name": "Test Guide", "link": "test_guide"},
         {"name": "Custom Dataset", "link": "custom"},
     ]
 

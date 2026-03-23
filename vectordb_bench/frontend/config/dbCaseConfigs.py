@@ -1,6 +1,7 @@
 from enum import IntEnum, Enum
 import typing
 from pydantic import BaseModel
+from vectordb_bench import config
 from vectordb_bench.backend.cases import CaseLabel, CaseType
 from vectordb_bench.backend.clients import DB
 from vectordb_bench.backend.clients.api import IndexType, MetricType, SQType
@@ -8,6 +9,47 @@ from vectordb_bench.backend.dataset import DatasetWithSizeType
 from vectordb_bench.frontend.components.custom.getCustomConfig import get_custom_configs
 
 from vectordb_bench.models import CaseConfig, CaseConfigParamType
+
+
+# Fallback enum for filter config params (in case CaseConfigParamType lacks them in older installs)
+class _FilterConfigParamType(Enum):
+    label_percentages = "label_percentages"
+    filter_rates = "filter_rates"
+
+
+# Fallback enum for optimization config params (quantization, granularity, hnsw_ef, on_disk, dynamic ef, etc.)
+class _OptConfigParamType(Enum):
+    quantization = "quantization"
+    granularity = "granularity"
+    hnsw_ef = "hnsw_ef"
+    on_disk = "on_disk"
+    dynamic_ef_factor = "dynamicEfFactor"
+    dynamic_ef_min = "dynamicEfMin"
+    dynamic_ef_max = "dynamicEfMax"
+
+
+def _filter_param(name: str):
+    return getattr(CaseConfigParamType, name, None) or getattr(_FilterConfigParamType, name)
+
+
+def _opt_param(name: str):
+    return getattr(CaseConfigParamType, name, None) or getattr(_OptConfigParamType, name)
+
+
+def _parse_percentages_or_rates(value: str | None) -> list[float] | None:
+    """Parse comma-separated floats (e.g. '0.001, 0.5'). Returns None if empty/invalid (use all)."""
+    if not value or not str(value).strip():
+        return None
+    result = []
+    for part in str(value).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            result.append(float(part))
+        except ValueError:
+            continue
+    return result if result else None
 
 MAX_STREAMLIT_INT = (1 << 53) - 1
 
@@ -33,7 +75,7 @@ class InputType(IntEnum):
 
 
 class ConfigInput(BaseModel):
-    label: CaseConfigParamType
+    label: CaseConfigParamType | _FilterConfigParamType | _OptConfigParamType  # fallbacks for filter/opt params
     inputType: InputType = InputType.Text
     inputConfig: dict = {}
     inputHelp: str = ""
@@ -90,24 +132,39 @@ class UICaseItem(BaseModel):
         return hash(self.key if self.key else self.label)
 
     def get_cases(self) -> list[CaseConfig]:
-        # return self.cases
+        cases = self.cases
+        # Filter by label_percentages or filter_rates when specified (reduces resource usage)
+        filter_keys = (_filter_param("label_percentages").value, _filter_param("filter_rates").value)
+        merge_config = {k: v for k, v in self.tmp_custom_config.items() if k not in filter_keys}
+        lp_key = _filter_param("label_percentages").value
+        if self.tmp_custom_config.get(lp_key):
+            allowed = _parse_percentages_or_rates(self.tmp_custom_config[lp_key])
+            if allowed is not None:
+                allowed_set = set(allowed)
+                cases = [c for c in cases if c.custom_case.get("label_percentage") in allowed_set]
+        fr_key = _filter_param("filter_rates").value
+        if self.tmp_custom_config.get(fr_key):
+            allowed = _parse_percentages_or_rates(self.tmp_custom_config[fr_key])
+            if allowed is not None:
+                allowed_set = set(allowed)
+                cases = [c for c in cases if c.custom_case.get("filter_rate") in allowed_set]
         if len(self.extra_custom_case_config_inputs) == 0:
-            return self.cases
-        cases = [
+            return cases
+        return [
             CaseConfig(
                 case_id=c.case_id,
                 k=c.k,
                 concurrency_search_config=c.concurrency_search_config,
-                custom_case={**c.custom_case, **self.tmp_custom_config},
+                custom_case={**c.custom_case, **merge_config},
             )
-            for c in self.cases
+            for c in cases
         ]
-        return cases
 
 
 class UICaseItemCluster(BaseModel):
     label: str = ""
     uiCaseItems: list[UICaseItem] = []
+    cluster_level_config_inputs: list[ConfigInput] = []
 
 
 def get_custom_case_items() -> list[UICaseItem]:
@@ -196,6 +253,7 @@ def generate_custom_streaming_case() -> CaseConfig:
     )
 
 
+# search_stages and concurrencies are now per-instance (in _streaming_scalability_config)
 custom_streaming_config: list[ConfigInput] = [
     ConfigInput(
         label=CaseConfigParamType.dataset_with_size_type,
@@ -208,18 +266,6 @@ custom_streaming_config: list[ConfigInput] = [
         inputType=InputType.Number,
         inputConfig=dict(step=100, min=100, max=4_000, value=200),
         inputHelp="fixed insertion rate (rows/s), must be divisible by 100",
-    ),
-    ConfigInput(
-        label=CaseConfigParamType.search_stages,
-        inputType=InputType.Text,
-        inputConfig=dict(value="[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]"),
-        inputHelp="0<=stage<1.0; do search test when inserting a specified amount of data.",
-    ),
-    ConfigInput(
-        label=CaseConfigParamType.concurrencies,
-        inputType=InputType.Text,
-        inputConfig=dict(value="[5, 10, 20]"),
-        inputHelp="concurrent num of search test while insertion; record max-qps.",
     ),
     ConfigInput(
         label=CaseConfigParamType.optimize_after_write,
@@ -264,6 +310,45 @@ def generate_int_filter_cases(dataset_with_size_type: DatasetWithSizeType) -> li
     ]
 
 
+# Config inputs for filter distribution selection (reduces resource usage when subset desired)
+label_filter_percentages_config = [
+    ConfigInput(
+        label=_filter_param("label_percentages"),
+        inputType=InputType.Text,
+        inputConfig={"value": getattr(config, "LABEL_FILTER_PERCENTAGES", "")},
+        inputHelp="Comma-separated percentages to run (e.g. 0.001,0.5 for 0.1% and 50%). Empty = use all.",
+        displayLabel="Label filter percentages (e.g. 0.001,0.5)",
+    ),
+]
+int_filter_rates_config = [
+    ConfigInput(
+        label=_filter_param("filter_rates"),
+        inputType=InputType.Text,
+        inputConfig={"value": getattr(config, "INT_FILTER_RATES", "")},
+        inputHelp="Comma-separated filter rates to run (e.g. 0.01,0.99 for 1% and 99%). Empty = use all.",
+        displayLabel="Int filter rates (e.g. 0.01,0.99)",
+    ),
+]
+
+# Per-instance scalability params (Streaming case) - shown in db_case_config_setting per instance
+_streaming_scalability_config: list[CaseConfigInput] = [
+    CaseConfigInput(
+        label=CaseConfigParamType.search_stages,
+        inputType=InputType.Text,
+        inputConfig=dict(value=getattr(config, "SEARCH_STAGES", "[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]")),
+        inputHelp="0<=stage<1.0; do search test when inserting a specified amount of data.",
+        displayLabel="Search stages",
+    ),
+    CaseConfigInput(
+        label=CaseConfigParamType.concurrencies,
+        inputType=InputType.Text,
+        inputConfig=dict(value=getattr(config, "STREAMING_CONCURRENCIES", "[5, 10, 20]")),
+        inputHelp="Concurrent num of search test while insertion; record max-qps.",
+        displayLabel="Concurrencies",
+    ),
+]
+
+
 UI_CASE_CLUSTERS: list[UICaseItemCluster] = [
     UICaseItemCluster(
         label="Search Performance Test",
@@ -296,13 +381,14 @@ UI_CASE_CLUSTERS: list[UICaseItemCluster] = [
     ),
     UICaseItemCluster(
         label="New-Int-Filter Search Performance Test",
+        cluster_level_config_inputs=int_filter_rates_config,
         uiCaseItems=[
             UICaseItem(
                 label=f"Int-Filter Search Performance Test - {dataset_with_size_type.value}",
                 description=(
                     f"[Batch Cases]These cases test the search performance of a vector database "
                     f"with dataset {dataset_with_size_type.value}"
-                    f"under filtering rates of {dataset_with_size_type.get_manager().data.scalar_int_rates}, at varying parallel levels."
+                    f"under filtering rates of {dataset_with_size_type.get_manager().data.scalar_int_rates}, at varying parallel levels. "
                     f"Results will show index building time, recall, and maximum QPS."
                 ),
                 cases=generate_int_filter_cases(dataset_with_size_type),
@@ -319,6 +405,7 @@ UI_CASE_CLUSTERS: list[UICaseItemCluster] = [
     ),
     UICaseItemCluster(
         label="Label-Filter Search Performance Test",
+        cluster_level_config_inputs=label_filter_percentages_config,
         uiCaseItems=[
             UICaseItem(
                 label=f"Label-Filter Search Performance Test - {dataset_with_size_type.value}",
@@ -327,7 +414,7 @@ UI_CASE_CLUSTERS: list[UICaseItemCluster] = [
                     "Vdbbench provides an additional column of randomly distributed labels with fixed proportions, "
                     f"such as {dataset_with_size_type.get_manager().data.scalar_label_percentages}. "
                     f"Essentially, vdbbench will test each filter label in {dataset_with_size_type.value} to "
-                    "assess the vector database's search performance across different filtering conditions. "
+                    "assess the vector database's search performance across different filtering conditions."
                 ),
                 cases=generate_label_filter_cases(dataset_with_size_type),
             )
@@ -389,7 +476,7 @@ class InputType(IntEnum):
 
 
 class CaseConfigInput(BaseModel):
-    label: CaseConfigParamType
+    label: CaseConfigParamType | _FilterConfigParamType | _OptConfigParamType
     inputType: InputType = InputType.Text
     inputConfig: dict = {}
     inputHelp: str = ""
@@ -770,6 +857,22 @@ CaseConfigParamInput_EF_Clickhouse = CaseConfigInput(
     inputHelp="Search-time candidate list size. Higher = better recall, higher latency. -1 = use default.",
     inputType=InputType.Number,
     inputConfig={"min": -1, "max": MAX_STREAMLIT_INT, "value": 100},
+    isDisplayed=lambda config: True,
+)
+CaseConfigParamInput_Quantization_Clickhouse = CaseConfigInput(
+    label=_opt_param("quantization"),
+    displayLabel="Quantization",
+    inputHelp="Vector quantization for HNSW index. bf16=BFloat16 (default, good balance). f32/f16=full/half precision. i8/b1=more compression, lower recall.",
+    inputType=InputType.Option,
+    inputConfig={"options": ["bf16", "f32", "f16", "i8", "b1"]},
+    isDisplayed=lambda config: True,
+)
+CaseConfigParamInput_Granularity_Clickhouse = CaseConfigInput(
+    label=_opt_param("granularity"),
+    displayLabel="Granularity",
+    inputHelp="Size of index granules (rows per sub-index). Larger = fewer granules, faster queries. Default 10M.",
+    inputType=InputType.Number,
+    inputConfig={"min": 100_000, "max": 100_000_000, "value": 10_000_000, "step": 100_000},
     isDisplayed=lambda config: True,
 )
 
@@ -2194,6 +2297,28 @@ MilvusPerformanceConfig = [
     CaseConfigParamInput_Milvus_use_partition_key,
 ]
 
+CaseConfigParamInput_dynamicEfFactor_Weaviate = CaseConfigInput(
+    label=_opt_param("dynamic_ef_factor"),
+    displayLabel="dynamicEfFactor",
+    inputHelp="When ef=-1, multiplier for dynamic ef. Default 8.",
+    inputType=InputType.Number,
+    inputConfig={"min": 1, "max": 64, "value": 8},
+)
+CaseConfigParamInput_dynamicEfMin_Weaviate = CaseConfigInput(
+    label=_opt_param("dynamic_ef_min"),
+    displayLabel="dynamicEfMin",
+    inputHelp="When ef=-1, lower bound for dynamic ef. Default 100.",
+    inputType=InputType.Number,
+    inputConfig={"min": 10, "max": 500, "value": 100},
+)
+CaseConfigParamInput_dynamicEfMax_Weaviate = CaseConfigInput(
+    label=_opt_param("dynamic_ef_max"),
+    displayLabel="dynamicEfMax",
+    inputHelp="When ef=-1, upper bound for dynamic ef. Default 500.",
+    inputType=InputType.Number,
+    inputConfig={"min": 100, "max": 2000, "value": 500},
+)
+
 WeaviateLoadConfig = [
     CaseConfigParamInput_MaxConnections,
     CaseConfigParamInput_EFConstruction_Weaviate,
@@ -2202,6 +2327,9 @@ WeaviatePerformanceConfig = [
     CaseConfigParamInput_MaxConnections,
     CaseConfigParamInput_EFConstruction_Weaviate,
     CaseConfigParamInput_EF_Weaviate,
+    CaseConfigParamInput_dynamicEfFactor_Weaviate,
+    CaseConfigParamInput_dynamicEfMin_Weaviate,
+    CaseConfigParamInput_dynamicEfMax_Weaviate,
 ]
 
 CaseConfigParamInput_m_QdrantLocal = CaseConfigInput(
@@ -2227,10 +2355,26 @@ CaseConfigParamInput_ef_construct_QdrantLocal = CaseConfigInput(
         "value": 200,
     },
 )
+CaseConfigParamInput_hnsw_ef_QdrantLocal = CaseConfigInput(
+    label=_opt_param("hnsw_ef"),
+    displayLabel="hnsw_ef (search)",
+    inputHelp="Search-time HNSW ef. Higher = better recall, higher latency. 0 = use Qdrant default.",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 1000, "value": 100},
+)
+CaseConfigParamInput_on_disk_QdrantLocal = CaseConfigInput(
+    label=_opt_param("on_disk"),
+    displayLabel="On disk",
+    inputHelp="Store vectors and index on disk. Reduces RAM use, may increase latency.",
+    inputType=InputType.Option,
+    inputConfig={"options": [False, True]},
+)
 
 QdrantLocalLoadConfig = [
     CaseConfigParamInput_m_QdrantLocal,
     CaseConfigParamInput_ef_construct_QdrantLocal,
+    CaseConfigParamInput_hnsw_ef_QdrantLocal,
+    CaseConfigParamInput_on_disk_QdrantLocal,
 ]
 QdrantLocalPerformanceConfig = QdrantLocalLoadConfig
 
@@ -2907,6 +3051,8 @@ ClickhousePerformanceConfig = [
     CaseConfigParamInput_M_Clickhouse,
     CaseConfigParamInput_EFConstruction_Clickhouse,
     CaseConfigParamInput_EF_Clickhouse,
+    CaseConfigParamInput_Quantization_Clickhouse,
+    CaseConfigParamInput_Granularity_Clickhouse,
 ]
 
 # Map DB to config
@@ -3017,6 +3163,9 @@ def get_case_config_inputs(db: DB, case_label: CaseLabel) -> list[CaseConfigInpu
     db_map = CASE_CONFIG_MAP[db]
     if case_label == CaseLabel.Load:
         return db_map.get(CaseLabel.Load, [])
-    if case_label in (CaseLabel.Performance, CaseLabel.Streaming):
+    if case_label == CaseLabel.Performance:
         return db_map.get(CaseLabel.Performance, [])
+    if case_label == CaseLabel.Streaming:
+        base = db_map.get(CaseLabel.Streaming, db_map.get(CaseLabel.Performance, []))
+        return base + _streaming_scalability_config
     return []

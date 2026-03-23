@@ -52,6 +52,17 @@ def welcomePrams(st):
     st.title("Welcome to VDBBench!")
     options = [
         {
+            "title": "Test Guide",
+            "description": (
+                "<span style='font-size: 17px;'>"
+                "New to benchmarks? Understand what each test does, why it matters, "
+                "and how to interpret results in simple terms."
+                "</span>"
+            ),
+            "image": "fig/homepage/bar-chart.png",
+            "link": "test_guide",
+        },
+        {
             "title": "Standard Test Results",
             "description": (
                 "<span style='font-size: 17px;'>"
@@ -150,7 +161,7 @@ def welcomePrams(st):
     for option in options:
         option["image"] = get_image_as_base64(option["image"])
 
-    for option in options[:7]:
+    for option in options[:8]:
         html_content += f"""
         <a href="/{option['link']}" target="_self" style="text-decoration: none;">
             <div class="section-card">
@@ -169,7 +180,7 @@ def welcomePrams(st):
     <div class="last-row">
     """
 
-    for option in options[7:9]:
+    for option in options[8:10]:
         html_content += f"""
         <a href="/{option['link']}" target="_self" style="text-decoration: none;">
             <div class="section-card">

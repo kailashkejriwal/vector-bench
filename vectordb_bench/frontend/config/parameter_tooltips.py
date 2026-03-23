@@ -108,8 +108,19 @@ PARAM_TOOLTIPS: dict[str, str] = {
     "insert_rate": "Insertion rate (rows/s). Performance impact: Higher rate = faster load; ensure DB can sustain it.",
     "search_stages": "Fractions of data at which to run search (e.g. [0.2, 0.5, 1.0]). Performance impact: More stages = more measurements, longer test.",
     "concurrencies": "Concurrency levels for search. Performance impact: Higher concurrency = measures max QPS; may increase latency.",
+    "num_concurrency": "Comma-separated concurrency levels for performance search tests (e.g. 1,5,10,20).",
+    "concurrency_duration": "Duration (seconds) for each concurrency level during performance tests.",
+    "concurrency_timeout": "Timeout (seconds) to wait for a concurrency slot. 0 = no limit.",
     "optimize_after_write": "Run optimize after all inserts. Performance impact: Improves search performance; adds time after load.",
     "read_dur_after_write": "Search test duration (s) after full insert. Performance impact: Longer = more stable QPS estimate.",
+    "label_percentages": "Comma-separated label filter percentages to run (e.g. 0.001,0.5 for 0.1% and 50%). Empty = use all. Performance impact: Fewer values = faster runs, lower resource use.",
+    "filter_rates": "Comma-separated int filter rates to run (e.g. 0.01,0.99 for 1% and 99%). Empty = use all. Performance impact: Fewer values = faster runs, lower resource use.",
+    "quantization": "ClickHouse HNSW: Vector quantization (bf16, f32, f16, i8, b1). bf16 = good balance; i8/b1 = more compression, lower recall.",
+    "granularity": "ClickHouse: Rows per index granule. Larger = fewer granules, faster queries. Default 10M.",
+    "hnsw_ef": "Qdrant: Search-time HNSW ef. Higher = better recall, higher latency. 0 = use default.",
+    "dynamicEfFactor": "Weaviate: When ef=-1, multiplier for dynamic ef. Default 8.",
+    "dynamicEfMin": "Weaviate: When ef=-1, lower bound for dynamic ef. Default 100.",
+    "dynamicEfMax": "Weaviate: When ef=-1, upper bound for dynamic ef. Default 500.",
 }
 
 # ---------------------------------------------------------------------------
@@ -175,8 +186,19 @@ PARAM_GROUPS: dict[str, str] = {
     "insert_rate": "Streaming load",
     "search_stages": "Streaming search",
     "concurrencies": "Streaming search",
+    "num_concurrency": "Performance concurrency",
+    "concurrency_duration": "Performance concurrency",
+    "concurrency_timeout": "Performance concurrency",
     "optimize_after_write": "Streaming options",
     "read_dur_after_write": "Streaming options",
+    "label_percentages": "Filter distribution",
+    "filter_rates": "Filter distribution",
+    "quantization": "ClickHouse optimization",
+    "granularity": "ClickHouse optimization",
+    "hnsw_ef": "Qdrant optimization",
+    "dynamicEfFactor": "Weaviate optimization",
+    "dynamicEfMin": "Weaviate optimization",
+    "dynamicEfMax": "Weaviate optimization",
 }
 
 
@@ -248,5 +270,7 @@ CUSTOM_FIELD_TOOLTIPS: dict[str, str] = {
     "ground truth emb name": "Column name for neighbor IDs in ground-truth file.",
     "scalar labels file name": "Optional file with scalar labels for filter tests (e.g. scalar_labels.parquet).",
     "label percentages": "Comma-separated filter fractions (e.g. 0.01,0.05,0.1). Performance impact: More values = more filter runs.",
+    "label_percentages": "Comma-separated label filter percentages to run (e.g. 0.001,0.5 for 0.1% and 50%). Empty = use all. Reduces resource usage.",
+    "filter_rates": "Comma-separated int filter rates to run (e.g. 0.01,0.99 for 1% and 99%). Empty = use all. Reduces resource usage.",
     "description": "Optional description for this custom case; used in results.",
 }

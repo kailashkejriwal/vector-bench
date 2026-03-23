@@ -52,34 +52,39 @@ def advancedSettings(st):
     container = st.columns([1, 2])
     defaultconcurrentInput = ",".join(map(str, config.NUM_CONCURRENCY))
     concurrentInput = container[0].text_input(
-        "Concurrent Input", value=defaultconcurrentInput, label_visibility="collapsed"
+        "Concurrencies", value=defaultconcurrentInput, label_visibility="collapsed"
     )
-    container[1].caption("num of concurrencies for search tests to get max-qps")
+    container[1].caption("num of concurrencies for performance search tests (e.g. 1,5,10,20)")
 
     container = st.columns([1, 2])
     concurrency_duration = container[0].number_input(
         "Concurrency Duration", value=config.CONCURRENCY_DURATION, label_visibility="collapsed"
     )
-    container[1].caption("concurrency duration for each concurrency search test")
-    return index_already_exists, use_aliyun, k, concurrentInput, concurrency_duration
+    container[1].caption("duration (s) for each concurrency level")
+
+    container = st.columns([1, 2])
+    concurrency_timeout = container[0].number_input(
+        "Concurrency Timeout", value=config.CONCURRENCY_TIMEOUT, min_value=0, label_visibility="collapsed"
+    )
+    container[1].caption("timeout (s) to wait for a concurrency slot. 0 = no limit")
+    return index_already_exists, use_aliyun, k, concurrentInput, concurrency_duration, concurrency_timeout
 
 
 def controlPanel(st, tasks: list[TaskConfig], taskLabel, isAllValid):
-    index_already_exists, use_aliyun, k, concurrentInput, concurrency_duration = advancedSettings(st)
+    index_already_exists, use_aliyun, k, concurrentInput, concurrency_duration, concurrency_timeout = advancedSettings(st)
 
     def runHandler():
         benchmark_runner.set_drop_old(not index_already_exists)
-
         try:
             concurrentInput_list = [int(item.strip()) for item in concurrentInput.split(",")]
         except ValueError:
-            st.write("please input correct number")
+            st.error("Please enter valid concurrencies (e.g. 1,5,10,20)")
             return None
-
         for task in tasks:
             task.case_config.k = k
             task.case_config.concurrency_search_config.num_concurrency = concurrentInput_list
             task.case_config.concurrency_search_config.concurrency_duration = concurrency_duration
+            task.case_config.concurrency_search_config.concurrency_timeout = concurrency_timeout
         benchmark_runner.set_download_address(use_aliyun)
         benchmark_runner.run(tasks, taskLabel)
 

@@ -26,6 +26,9 @@ class WeaviateIndexConfig(BaseModel, DBCaseConfig):
     ef: int | None = -1
     efConstruction: int | None = None
     maxConnections: int | None = None
+    dynamicEfFactor: int | None = 8
+    dynamicEfMin: int | None = 100
+    dynamicEfMax: int | None = 500
 
     def parse_metric(self) -> str:
         if self.metric_type == MetricType.L2:
@@ -46,6 +49,11 @@ class WeaviateIndexConfig(BaseModel, DBCaseConfig):
         return params
 
     def search_param(self) -> dict:
-        return {
-            "ef": self.ef,
-        }
+        params: dict = {"ef": self.ef}
+        if self.dynamicEfFactor is not None:
+            params["dynamicEfFactor"] = self.dynamicEfFactor
+        if self.dynamicEfMin is not None:
+            params["dynamicEfMin"] = self.dynamicEfMin
+        if self.dynamicEfMax is not None:
+            params["dynamicEfMax"] = self.dynamicEfMax
+        return params
