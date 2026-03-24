@@ -751,6 +751,8 @@ CaseConfigParamInput_IndexType_PgVectoRS = CaseConfigInput(
     },
 )
 
+_HNSW_INDEX_TYPES = [IndexType.HNSW.value, IndexType.HNSW_SQ.value, IndexType.HNSW_PQ.value, IndexType.HNSW_PRQ.value]
+
 CaseConfigParamInput_M = CaseConfigInput(
     label=CaseConfigParamType.M,
     inputType=InputType.Number,
@@ -759,13 +761,7 @@ CaseConfigParamInput_M = CaseConfigInput(
         "max": 64,
         "value": 16,
     },
-    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None)
-    in [
-        IndexType.HNSW.value,
-        IndexType.HNSW_SQ.value,
-        IndexType.HNSW_PQ.value,
-        IndexType.HNSW_PRQ.value,
-    ],
+    isDisplayed=lambda config: (config.get(CaseConfigParamType.IndexType) or IndexType.HNSW.value) in _HNSW_INDEX_TYPES,
 )
 
 
@@ -794,22 +790,17 @@ CaseConfigParamInput_m_OceanBase = CaseConfigInput(
     in [IndexType.HNSW.value, IndexType.HNSW_SQ.value, IndexType.HNSW_BQ.value],
 )
 
-
 CaseConfigParamInput_EFConstruction_Milvus = CaseConfigInput(
     label=CaseConfigParamType.EFConstruction,
+    displayLabel="efConstruction",
+    inputHelp="HNSW build-time candidate list size. Higher = better recall, longer build.",
     inputType=InputType.Number,
     inputConfig={
         "min": 8,
         "max": 512,
         "value": 256,
     },
-    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None)
-    in [
-        IndexType.HNSW.value,
-        IndexType.HNSW_SQ.value,
-        IndexType.HNSW_PQ.value,
-        IndexType.HNSW_PRQ.value,
-    ],
+    isDisplayed=lambda config: (config.get(CaseConfigParamType.IndexType) or IndexType.HNSW.value) in _HNSW_INDEX_TYPES,
 )
 
 CaseConfigParamInput_EFConstruction_OceanBase = CaseConfigInput(
@@ -1166,19 +1157,15 @@ CaseConfigParamInput_NumCandidates_ES = CaseConfigInput(
 
 CaseConfigParamInput_EF_Milvus = CaseConfigInput(
     label=CaseConfigParamType.EF,
+    displayLabel="ef (search)",
+    inputHelp="Search-time HNSW ef. Higher = better recall, higher latency.",
     inputType=InputType.Number,
     inputConfig={
         "min": 100,
         "max": MAX_STREAMLIT_INT,
         "value": 100,
     },
-    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None)
-    in [
-        IndexType.HNSW.value,
-        IndexType.HNSW_SQ.value,
-        IndexType.HNSW_PQ.value,
-        IndexType.HNSW_PRQ.value,
-    ],
+    isDisplayed=lambda config: (config.get(CaseConfigParamType.IndexType) or IndexType.HNSW.value) in _HNSW_INDEX_TYPES,
 )
 
 CaseConfigParamInput_EF_Weaviate = CaseConfigInput(
