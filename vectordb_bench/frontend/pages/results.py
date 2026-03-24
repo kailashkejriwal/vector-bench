@@ -111,7 +111,7 @@ def main():
         if not showCaseNames and not failedTasks:
             st.info("No NonFilter benchmark data in the selected run(s).")
         else:
-            drawCharts(st, shownData, failedTasks, showCaseNames, use_expander=False)
+            drawCharts(st, shownData, failedTasks, showCaseNames, use_expander=False, key_prefix="std")
 
     # 2. Int Filter (NumGE)
     with st.expander("**Int Filter** – numeric range filters (e.g. id >= X)"):
@@ -123,7 +123,7 @@ def main():
         if not showCaseNames and not failedTasks:
             st.info("No Int Filter benchmark data in the selected run(s).")
         else:
-            drawCharts(st, shownData, failedTasks, showCaseNames, use_expander=False)
+            drawCharts(st, shownData, failedTasks, showCaseNames, use_expander=False, key_prefix="int")
 
     # 3. Label Filter (StrEqual)
     with st.expander("**Label Filter** – string equality filters (e.g. label = 'X')"):
@@ -135,7 +135,7 @@ def main():
         if not showCaseNames and not failedTasks:
             st.info("No Label Filter benchmark data in the selected run(s).")
         else:
-            drawCharts(st, shownData, failedTasks, showCaseNames, use_expander=False)
+            drawCharts(st, shownData, failedTasks, showCaseNames, use_expander=False, key_prefix="label")
 
     # 4. QPS & Recall (scatter)
     with st.expander("**QPS & Recall** – trade-off comparison (NonFilter performance)"):
