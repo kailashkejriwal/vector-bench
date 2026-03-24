@@ -46,9 +46,10 @@ def _to_display_value_and_unit(metric: str, raw_value: float) -> tuple[float, st
     return (raw_value, f" {unit}" if unit else "")
 
 
-def drawCharts(st, allData, failedTasks, caseNames: list[str], use_expander: bool = True):
+def drawCharts(st, allData, failedTasks, caseNames: list[str], use_expander: bool = True, key_prefix: str = ""):
     """use_expander=False when inside another expander to avoid Streamlit's nested-expander restriction."""
     initMainExpanderStyle(st)
+    section_prefix = f"{key_prefix}-" if key_prefix else ""
     for caseName in caseNames:
         if use_expander:
             chartContainer = st.expander(caseName, True)
@@ -56,7 +57,7 @@ def drawCharts(st, allData, failedTasks, caseNames: list[str], use_expander: boo
             chartContainer = st.container()
             chartContainer.markdown(f"**{caseName}**")
         data = [data for data in allData if data["case_name"] == caseName]
-        drawChart(data, chartContainer, key_prefix=caseName)
+        drawChart(data, chartContainer, key_prefix=f"{section_prefix}{caseName}")
 
         errorDBs = failedTasks.get(caseName, {})
         showFailedDBs(chartContainer, errorDBs)

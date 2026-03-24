@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
 
-def drawCharts(st, allData, caseNames: list[str], use_expander: bool = True):
+def drawCharts(st, allData, caseNames: list[str], use_expander: bool = True, key_prefix: str = "qpsrecall"):
     """use_expander=False when inside another expander to avoid Streamlit's nested-expander restriction."""
     initMainExpanderStyle(st)
     for caseName in caseNames:
@@ -19,7 +19,7 @@ def drawCharts(st, allData, caseNames: list[str], use_expander: bool = True):
             chartContainer = st.container()
             chartContainer.markdown(f"**{caseName}**")
         data = [data for data in allData if data["case_name"] == caseName]
-        drawChart(data, chartContainer, key_prefix=caseName)
+        drawChart(data, chartContainer, key_prefix=f"{key_prefix}-{caseName}")
 
 
 def drawChart(data, st, key_prefix: str):
