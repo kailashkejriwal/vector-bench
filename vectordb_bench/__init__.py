@@ -57,6 +57,8 @@ class config:
     CLICKHOUSE_DATA_DIR = env.str("CLICKHOUSE_DATA_DIR", "")
     # Milvus (Docker standalone) data on NVMe: mounts to /var/lib/milvus in container
     MILVUS_DATA_DIR = env.str("MILVUS_DATA_DIR", "")
+    # Qdrant (Docker) storage on NVMe: mounts to /qdrant/storage in container
+    QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
 
     K_DEFAULT = 100  # default return top k nearest neighbors during search
     CUSTOM_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("custom/custom_case.json")
