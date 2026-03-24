@@ -11,8 +11,8 @@ log = logging.getLogger(__name__)
 # Milvus index build is memory-heavy; 2Gi often OOMs for 1536-dim, so we use 4Gi for (50k, 1536).
 _SIZE_DIM_TO_PROFILE: dict[tuple[int, int], tuple[str, str]] = {
     (50_000, 1536): ("1", "4Gi"),
-    (100_000, 768): ("1", "2Gi"),
-    (500_000, 128): ("1", "2Gi"),
+    (100_000, 768): ("2", "8Gi"),
+    (500_000, 128): ("2", "4Gi"),
     (500_000, 1536): ("2", "4Gi"),
     (500_000, 960): ("2", "4Gi"),
     (1_000_000, 768): ("2", "8Gi"),
