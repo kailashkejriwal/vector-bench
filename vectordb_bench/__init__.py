@@ -67,6 +67,10 @@ class config:
     POST_PROVISION_SYNC_BEFORE_COOLDOWN = env.bool("POST_PROVISION_SYNC_BEFORE_COOLDOWN", False)
     # Max seconds to poll `docker inspect` until the container is gone after rm (clean handoff for host metrics).
     DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC = env.int("DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC", 120)
+    # Cap ClickHouse threads per vector search query. Vector similarity index search can oversubscribe
+    # the server when many benchmark clients run in parallel; this limits per-query parallelism.
+    # Default 8; set to 0 to omit (use server defaults only).
+    CLICKHOUSE_QUERY_MAX_THREADS = env.int("CLICKHOUSE_QUERY_MAX_THREADS", 8)
 
     K_DEFAULT = 100  # default return top k nearest neighbors during search
     CUSTOM_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("custom/custom_case.json")

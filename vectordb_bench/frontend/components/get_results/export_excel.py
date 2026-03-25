@@ -110,6 +110,44 @@ def _write_glossary_sheet(wb) -> None:
     ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
     row += 2
 
+    # --- How many searches run (plain language) ---
+    ws.cell(row=row, column=1, value="How search tests work")
+    ws.cell(row=row, column=1).font = Font(bold=True, size=12)
+    row += 1
+    ws.cell(row=row, column=1, value="Term")
+    ws.cell(row=row, column=2, value="Plain explanation")
+    _style_header(ws.cell(row=row, column=1))
+    _style_header(ws.cell(row=row, column=2))
+    row += 1
+    _search_workload_glossary = [
+        (
+            "Serial search",
+            "Searches run one after another, in order. The number of searches equals the number of "
+            "query vectors in the test set (from the dataset test file). Example: 1,000 vectors → "
+            "1,000 searches for that pass. This pass is used for recall, NDCG, and serial latency (p99 / p95).",
+        ),
+        (
+            "Concurrent search",
+            "Many searches run in parallel for a fixed amount of time (default 30 seconds per concurrency "
+            "level in a standard performance case). The benchmark keeps cycling through the same query vectors "
+            "until the timer stops. So the total count is not “one search per vector”; it can be much higher "
+            "or lower depending on speed. Each concurrency level (e.g. 1 worker, then 5, then 10) is its own timed run.",
+        ),
+        (
+            "Streaming / search while loading",
+            "Same pattern: one full serial pass over every test vector, plus timed concurrent search. "
+            "The concurrent phase often uses a longer time per level than standard performance (set in the case).",
+        ),
+    ]
+    for term, desc in _search_workload_glossary:
+        ws.cell(row=row, column=1, value=term)
+        ws.cell(row=row, column=2, value=desc)
+        ws.cell(row=row, column=2).alignment = Alignment(wrap_text=True)
+        _style_cell(ws.cell(row=row, column=1))
+        _style_cell(ws.cell(row=row, column=2))
+        row += 1
+    row += 2
+
     # --- Result metrics (from RESULTS_METRIC_GROUPS) ---
     ws.cell(row=row, column=1, value="Result metrics (column headings in case sheets)")
     ws.cell(row=row, column=1).font = Font(bold=True, size=12)
