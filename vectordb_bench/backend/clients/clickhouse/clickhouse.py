@@ -335,5 +335,13 @@ class Clickhouse(VectorDB):
         if apply_label_filter:
             params["label_val"] = label_val
 
-        result = self.conn.execute(sql, params)
+        exec_kwargs: dict[str, Any] = {}
+        mt = int(getattr(config, "CLICKHOUSE_QUERY_MAX_THREADS", 0) or 0)
+        if mt > 0:
+            # merge_tree_max_threads also bounds parallel part reads; vector index search touches MergeTree paths.
+            exec_kwargs["settings"] = {
+                "max_threads": mt,
+                "merge_tree_max_threads": mt,
+            }
+        result = self.conn.execute(sql, params, **exec_kwargs)
         return [int(row[0]) for row in result]
