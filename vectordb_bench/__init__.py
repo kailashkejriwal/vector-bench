@@ -59,6 +59,14 @@ class config:
     MILVUS_DATA_DIR = env.str("MILVUS_DATA_DIR", "")
     # Qdrant (Docker) storage on NVMe: mounts to /qdrant/storage in container
     QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
+    # Seconds of idle time on the host when switching from one DB workload to another (0 = no delay).
+    # Used after auto teardown (once removal is confirmed) before the next auto DB, before the first manual
+    # runner if its DB differs from the last auto DB, and between manual runners when the DB changes.
+    POST_PROVISION_TEARDOWN_DELAY_SEC = env.int("POST_PROVISION_TEARDOWN_DELAY_SEC", 0)
+    # Run `sync` once before each quiet window (may help disk-usage panels settle; does not drop page cache).
+    POST_PROVISION_SYNC_BEFORE_COOLDOWN = env.bool("POST_PROVISION_SYNC_BEFORE_COOLDOWN", False)
+    # Max seconds to poll `docker inspect` until the container is gone after rm (clean handoff for host metrics).
+    DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC = env.int("DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC", 120)
 
     K_DEFAULT = 100  # default return top k nearest neighbors during search
     CUSTOM_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("custom/custom_case.json")
