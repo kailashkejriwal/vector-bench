@@ -7,6 +7,8 @@ import subprocess
 import time
 from typing import Any
 
+from vectordb_bench import config
+
 from .base import ConnectionInfo, InstanceConfig, Provisioner, ResourceProfile
 
 log = logging.getLogger(__name__)
@@ -15,6 +17,7 @@ PROVISION_TIMEOUT_SEC = 300
 TEARDOWN_TIMEOUT_SEC = 60
 DEFAULT_READINESS_WAIT_SEC = 2
 READINESS_POLL_INTERVAL_SEC = 2
+CONTAINER_REMOVAL_POLL_SEC = 0.5
 
 
 def _run(cmd: list[str], timeout: int = 60, check: bool = True) -> subprocess.CompletedProcess:
@@ -87,6 +90,39 @@ def _inspect_port(container_id: str, container_port: int) -> str:
     if port_str and port_str.isdigit():
         return port_str
     return str(container_port)
+
+
+def _container_still_exists(container_id: str) -> bool:
+    proc = subprocess.run(
+        ["docker", "inspect", container_id],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
+def _wait_until_container_removed(container_id: str) -> None:
+    """Block until `docker inspect` fails (container fully gone)."""
+    timeout_sec = config.DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC
+    deadline = time.monotonic() + timeout_sec
+    short = container_id[:12]
+    log.info(
+        "Teardown: waiting until container %s is absent from Docker (timeout=%ss, poll=%ss)",
+        short,
+        timeout_sec,
+        CONTAINER_REMOVAL_POLL_SEC,
+    )
+    while time.monotonic() < deadline:
+        if not _container_still_exists(container_id):
+            log.info("Teardown: container %s confirmed removed", short)
+            return
+        time.sleep(CONTAINER_REMOVAL_POLL_SEC)
+    if _container_still_exists(container_id):
+        raise RuntimeError(
+            f"Timed out after {timeout_sec}s waiting for Docker to remove container {short}"
+        )
 
 
 def _get_container_logs(container_id: str, tail: int | None = None) -> str:
@@ -220,21 +256,24 @@ class DockerContainerProvisioner(Provisioner):
                 self.container_id[:12],
             )
             return
+        cid = self.container_id
         try:
-            log.info("Teardown: stopping and removing container id=%s", self.container_id[:12] if self.container_id else None)
-            _run(["docker", "stop", "-t", "5", self.container_id], timeout=TEARDOWN_TIMEOUT_SEC)
-        except Exception as e:
-            log.warning("Teardown stop failed (container may already have exited): %s", e)
-        try:
-            subprocess.run(
-                ["docker", "rm", "-f", self.container_id],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-            log.info("Teardown: container removed")
-        except Exception as e:
-            log.warning("Teardown rm failed: %s", e)
+            log.info("Teardown: stopping and removing container id=%s", cid[:12])
+            try:
+                _run(["docker", "stop", "-t", "5", cid], timeout=TEARDOWN_TIMEOUT_SEC)
+            except Exception as e:
+                log.warning("Teardown stop failed (container may already have exited): %s", e)
+            try:
+                subprocess.run(
+                    ["docker", "rm", "-f", cid],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+                log.info("Teardown: docker rm issued for id=%s", cid[:12])
+            except Exception as e:
+                log.warning("Teardown rm failed: %s", e)
+            _wait_until_container_removed(cid)
         finally:
             self.container_id = None

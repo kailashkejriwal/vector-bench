@@ -1,8 +1,11 @@
 """Sequential orchestrator: provision -> run benchmarks -> teardown per DB."""
 
 import logging
+import subprocess
+import time
 from collections import defaultdict
 
+from vectordb_bench import config
 from vectordb_bench.backend.clients import DB
 from vectordb_bench.backend.provisioning import (
     connection_info_to_db_config,
@@ -24,6 +27,38 @@ from vectordb_bench.models import (
 log = logging.getLogger(__name__)
 
 
+def _next_db_after_auto_teardown(
+    db_idx: int,
+    sorted_auto_items: list[tuple[DB, list[CaseRunner]]],
+    manual_runners: list[CaseRunner],
+) -> DB | None:
+    if db_idx < len(sorted_auto_items) - 1:
+        return sorted_auto_items[db_idx + 1][0]
+    if manual_runners:
+        return manual_runners[0].config.db
+    return None
+
+
+def _metrics_quiet_window(gap: int, after_db: DB, before_db: DB | None) -> None:
+    """Host idle period so CPU/memory/disk charts can show separation between DB runs."""
+    if gap <= 0:
+        return
+    if config.POST_PROVISION_SYNC_BEFORE_COOLDOWN:
+        try:
+            log.info("POST_PROVISION_SYNC_BEFORE_COOLDOWN: running sync(1) before quiet window")
+            subprocess.run(["sync"], timeout=300, check=False)
+        except Exception as e:
+            log.warning("sync before metrics quiet window failed: %s", e)
+    before = before_db.name if before_db else "(end)"
+    log.info(
+        "METRICS_QUIET_WINDOW sec=%s after_db=%s before_db=%s",
+        gap,
+        after_db.name,
+        before,
+    )
+    time.sleep(gap)
+
+
 def run_with_auto_provision(
     case_runners: list[CaseRunner],
     drop_old: bool,
@@ -33,6 +68,8 @@ def run_with_auto_provision(
     Run case_runners, provisioning DBs sequentially for those with auto_start=True.
     For each DB with auto_start: provision -> run all its runners -> teardown.
     Then run remaining (manual) runners in order.
+    When POST_PROVISION_TEARDOWN_DELAY_SEC > 0, inserts a metrics quiet window between different DBs
+    (auto→auto, last auto→first manual if DB changes, manual→manual when DB changes).
     send_conn: optional multiprocessing Connection to send (SIGNAL.WIP, idx) after each case.
     """
     auto_runners_by_db: dict[DB, list[CaseRunner]] = defaultdict(list)
@@ -86,7 +123,10 @@ def run_with_auto_provision(
         return case_res, new_cached_load, new_cached_write_qps
 
     # Sequential auto-provision per DB
-    for db, runners in sorted(auto_runners_by_db.items(), key=lambda x: x[0].name):
+    sorted_auto_items = sorted(auto_runners_by_db.items(), key=lambda x: x[0].name)
+    last_completed_db: DB | None = None
+    cooldown_state: dict[str, bool] = {"first_manual_transition_pre_slept": False}
+    for db_idx, (db, runners) in enumerate(sorted_auto_items):
         provisioner = get_provisioner(db)
         if not provisioner:
             log.warning(f"No provisioner for {db}, skipping auto-provision runners")
@@ -166,17 +206,53 @@ def run_with_auto_provision(
                 provisioner.teardown(leave_running=leave_running)
             except Exception as e:
                 log.warning(f"Teardown failed for {db}: {e}")
+            gap = config.POST_PROVISION_TEARDOWN_DELAY_SEC
+            next_db = _next_db_after_auto_teardown(db_idx, sorted_auto_items, manual_runners)
+            if gap > 0 and next_db is not None and next_db != db:
+                if leave_running:
+                    log.warning(
+                        "POST_PROVISION_TEARDOWN_DELAY_SEC=%s but leave_container_running=True for %s; "
+                        "previous container is still running — host metrics may overlap with the next DB.",
+                        gap,
+                        db.name,
+                    )
+                _metrics_quiet_window(gap, db, next_db)
+                if (
+                    db_idx == len(sorted_auto_items) - 1
+                    and manual_runners
+                    and manual_runners[0].config.db == next_db
+                ):
+                    cooldown_state["first_manual_transition_pre_slept"] = True
+            elif gap > 0 and next_db is None:
+                log.info(
+                    "POST_PROVISION_TEARDOWN_DELAY_SEC=%s set but no following workload after %s; skipping quiet window.",
+                    gap,
+                    db.name,
+                )
+            last_completed_db = db
 
     # Manual runners (existing order) with same drop/cache logic as original
     latest_runner = None
     cached_load_duration = None
     cached_write_qps = 0.0
+    first_manual_runner = True
     for r in manual_runners:
+        gap = config.POST_PROVISION_TEARDOWN_DELAY_SEC
+        if (
+            gap > 0
+            and last_completed_db is not None
+            and last_completed_db != r.config.db
+        ):
+            skip = first_manual_runner and cooldown_state["first_manual_transition_pre_slept"]
+            if not skip:
+                _metrics_quiet_window(gap, last_completed_db, r.config.db)
+        first_manual_runner = False
         use_drop = drop_old and not (latest_runner and r == latest_runner)
         case_res, cached_load_duration, cached_write_qps = run_one(
             r, use_drop, cached_load_duration, cached_write_qps
         )
         results.append(case_res)
+        last_completed_db = r.config.db
         if case_res.label == ResultLabel.NORMAL:
             latest_runner = r
 
