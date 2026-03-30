@@ -1,6 +1,7 @@
 """Docker-based provisioner helpers (subprocess, no docker SDK dependency)."""
 
 import logging
+import pathlib
 import re
 import socket
 import subprocess
@@ -123,6 +124,46 @@ def _wait_until_container_removed(container_id: str) -> None:
         raise RuntimeError(
             f"Timed out after {timeout_sec}s waiting for Docker to remove container {short}"
         )
+
+
+def _safe_log_filename_component(name: str, max_len: int = 80) -> str:
+    s = re.sub(r"[^a-zA-Z0-9._-]+", "_", (name or "image").strip())[:max_len]
+    return s or "container"
+
+
+def archive_container_logs_before_rm(container_id: str, image: str) -> pathlib.Path | None:
+    """Write full `docker logs` to disk for post-mortem debugging. Call after stop, before rm."""
+    if not getattr(config, "SAVE_PROVISIONED_CONTAINER_LOGS", False):
+        return None
+    dest_dir = pathlib.Path(config.PROVISIONED_CONTAINER_LOGS_DIR)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    short = container_id[:12]
+    tag = _safe_log_filename_component(image.replace("/", "_"))
+    out_path = dest_dir / f"{tag}_{short}_{ts}.log"
+    try:
+        proc = subprocess.run(
+            ["docker", "logs", container_id],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        parts = [proc.stdout or "", proc.stderr or ""]
+        body = "\n".join(p for p in parts if p.strip() or p == "")
+        if not body.strip() and proc.returncode != 0:
+            body = f"(docker logs failed, rc={proc.returncode})\n{proc.stderr or proc.stdout or ''}"
+        out_path.write_text(body, encoding="utf-8")
+        log.info(
+            "Archived container logs to %s (docker logs rc=%s, %d bytes)",
+            out_path,
+            proc.returncode,
+            len(body.encode("utf-8")),
+        )
+        return out_path
+    except Exception as e:
+        log.warning("Could not archive docker logs for %s: %s", short, e)
+        return None
 
 
 def _get_container_logs(container_id: str, tail: int | None = None) -> str:
@@ -263,6 +304,10 @@ class DockerContainerProvisioner(Provisioner):
                 _run(["docker", "stop", "-t", "5", cid], timeout=TEARDOWN_TIMEOUT_SEC)
             except Exception as e:
                 log.warning("Teardown stop failed (container may already have exited): %s", e)
+            try:
+                archive_container_logs_before_rm(cid, self.image or "")
+            except Exception as e:
+                log.warning("Teardown: saving container logs failed: %s", e)
             try:
                 subprocess.run(
                     ["docker", "rm", "-f", cid],
