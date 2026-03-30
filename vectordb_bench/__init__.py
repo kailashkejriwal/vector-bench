@@ -48,6 +48,12 @@ class config:
         _default_results_dir,
     )
     RESULTS_DEFAULT_DIR = _default_results_dir  # fallback when configured dir has no results
+    # After docker stop, full `docker logs` output is written here before rm (auto-provision teardown).
+    SAVE_PROVISIONED_CONTAINER_LOGS = env.bool("SAVE_PROVISIONED_CONTAINER_LOGS", False)
+    PROVISIONED_CONTAINER_LOGS_DIR = env.path(
+        "PROVISIONED_CONTAINER_LOGS_DIR",
+        RESULTS_LOCAL_DIR / "container_logs",
+    )
     CONFIG_LOCAL_DIR = env.path(
         "CONFIG_LOCAL_DIR",
         pathlib.Path(__file__).parent.joinpath("config-files"),
