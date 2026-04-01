@@ -65,6 +65,10 @@ class config:
     MILVUS_DATA_DIR = env.str("MILVUS_DATA_DIR", "")
     # Qdrant (Docker) storage on NVMe: mounts to /qdrant/storage in container
     QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
+    # PgVector (Docker): host path mounted to Postgres PGDATA for persistence / large disk (e.g. NVMe).
+    PGVECTOR_DATA_DIR = env.str("PGVECTOR_DATA_DIR", "")
+    # Image for auto-provisioned PgVector. Docker Hub often has no :latest; pin a pgNN tag.
+    PGVECTOR_DOCKER_IMAGE = env.str("PGVECTOR_DOCKER_IMAGE", "pgvector/pgvector:pg16")
     # Seconds of idle time on the host when switching from one DB workload to another (0 = no delay).
     # Used after auto teardown (once removal is confirmed) before the next auto DB, before the first manual
     # runner if its DB differs from the last auto DB, and between manual runners when the DB changes.

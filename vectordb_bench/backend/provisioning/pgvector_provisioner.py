@@ -1,30 +1,60 @@
 """PgVector Docker provisioner."""
 
+import logging
+import pathlib
+import time
+
 from pydantic import SecretStr
 
-from vectordb_bench.backend.clients import DB
+from vectordb_bench import config
 from vectordb_bench.backend.clients.pgvector.config import PgVectorConfig
-from vectordb_bench.backend.provisioning.base import ConnectionInfo, InstanceConfig, ResourceProfile
+from vectordb_bench.backend.provisioning.base import ConnectionInfo
 from vectordb_bench.backend.provisioning.docker_base import DockerContainerProvisioner
 
-# Always use latest image (pulled via --pull always in docker_base)
-PGVECTOR_IMAGE = "pgvector/pgvector:latest"
+log = logging.getLogger(__name__)
+
 PGVECTOR_PORT = 5432
 DEFAULT_USER = "postgres"
 DEFAULT_PASSWORD = "postgres"
 DEFAULT_DB = "vectordbbench"
+# Extra wait after TCP accept: cold data dir init / restart can lag behind port open.
+PGVECTOR_POST_READINESS_DELAY_SEC = 5
+# Official Postgres image PGDATA
+PGVECTOR_CONTAINER_PGDATA = "/var/lib/postgresql/data"
 
 
 class PgVectorDockerProvisioner(DockerContainerProvisioner):
-    """Provision PgVector via Docker (pgvector/pgvector:pg16)."""
+    """Provision PgVector via Docker (pgvector/pgvector, Postgres + extension)."""
 
-    image = PGVECTOR_IMAGE
     container_port = PGVECTOR_PORT
     env = [
         f"POSTGRES_USER={DEFAULT_USER}",
         f"POSTGRES_PASSWORD={DEFAULT_PASSWORD}",
         f"POSTGRES_DB={DEFAULT_DB}",
     ]
+
+    def __init__(self) -> None:
+        # Pin via PGVECTOR_DOCKER_IMAGE — :latest is often missing on Docker Hub.
+        img = (config.PGVECTOR_DOCKER_IMAGE or "").strip()
+        self.image = img or "pgvector/pgvector:pg16"
+
+    def _get_extra_container_args(self) -> list[str]:
+        """Mount PGVECTOR_DATA_DIR to Postgres PGDATA when set (NVMe / persistence)."""
+        data_dir = (config.PGVECTOR_DATA_DIR or "").strip()
+        if not data_dir:
+            return []
+        path = pathlib.Path(data_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        log.info("PgVector: mounting host data dir %s → %s", path, PGVECTOR_CONTAINER_PGDATA)
+        return ["-v", f"{path}:{PGVECTOR_CONTAINER_PGDATA}"]
+
+    def _wait_until_ready(self, host: str, port: int, timeout_sec: int = 600) -> None:
+        super()._wait_until_ready(host, port, timeout_sec)
+        log.info(
+            "PgVector: waiting %ds for Postgres to accept connections after TCP bind",
+            PGVECTOR_POST_READINESS_DELAY_SEC,
+        )
+        time.sleep(PGVECTOR_POST_READINESS_DELAY_SEC)
 
     def _connection_info(self, host_port: str) -> ConnectionInfo:
         return {

@@ -53,12 +53,8 @@ class PgVector(VectorDB):
         self._vector_field = "embedding"
         self._scalar_label_field = "label"
 
-        # construct basic units
+        # construct basic units (extension + register_vector happen in _create_connection)
         self.conn, self.cursor = self._create_connection(**self.connect_config)
-
-        # create vector extension
-        self.cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        self.conn.commit()
 
         log.info(f"{self.name} config values: {self.connect_config}\n{self.case_config}")
         if not any(
@@ -89,8 +85,12 @@ class PgVector(VectorDB):
     @staticmethod
     def _create_connection(**kwargs) -> tuple[Connection, Cursor]:
         conn = psycopg.connect(**kwargs)
-        register_vector(conn)
+        # register_vector() inspects pg_type; CREATE EXTENSION must run first on a fresh DB.
+        conn.autocommit = True
+        with conn.cursor() as setup_cur:
+            setup_cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
         conn.autocommit = False
+        register_vector(conn)
         cursor = conn.cursor()
 
         assert conn is not None, "Connection is not initialized"
