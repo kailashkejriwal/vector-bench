@@ -1,6 +1,7 @@
 """Docker-based provisioner helpers (subprocess, no docker SDK dependency)."""
 
 import logging
+import os
 import pathlib
 import re
 import socket
@@ -64,6 +65,32 @@ def _memory_for_docker(memory: str) -> str:
     if unit == "m":
         return f"{num}m"
     return f"{num}g"  # g or default
+
+
+def _cpus_for_docker(cpu: str) -> str:
+    """Clamp requested --cpus to host logical CPUs (avoids 'range of CPUs is from 0.01 to N' on small VMs)."""
+    s = (cpu or "").strip()
+    if not s:
+        return "1"
+    try:
+        req = float(s)
+    except ValueError:
+        return s
+    host_n = os.cpu_count()
+    if host_n is None or host_n < 1:
+        return s
+    host_f = float(host_n)
+    if req > host_f:
+        log.warning(
+            "Requested docker --cpus=%s exceeds host logical cpus=%s; using %s",
+            s,
+            host_n,
+            host_n,
+        )
+        capped = host_f
+    else:
+        capped = req
+    return str(int(capped)) if capped == int(capped) else str(capped)
 
 
 def _inspect_port(container_id: str, container_port: int) -> str:
@@ -212,7 +239,7 @@ class DockerContainerProvisioner(Provisioner):
             "-d",
             "--pull", "always",
             "-p", str(self.container_port),  # publish to random host port
-            "--cpus", resource_profile.cpu,
+            "--cpus", _cpus_for_docker(resource_profile.cpu),
         ]
         if getattr(config, "PROVISION_DOCKER_MEMORY_UNLIMITED", False):
             log.info(
