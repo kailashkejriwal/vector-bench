@@ -213,8 +213,13 @@ class DockerContainerProvisioner(Provisioner):
             "--pull", "always",
             "-p", str(self.container_port),  # publish to random host port
             "--cpus", resource_profile.cpu,
-            "--memory", _memory_for_docker(resource_profile.memory),
         ]
+        if getattr(config, "PROVISION_DOCKER_MEMORY_UNLIMITED", False):
+            log.info(
+                "Provision step: PROVISION_DOCKER_MEMORY_UNLIMITED=1 — omitting docker --memory (host RAM only)"
+            )
+        else:
+            args.extend(["--memory", _memory_for_docker(resource_profile.memory)])
         if self.env:
             for e in self.env:
                 args.extend(["-e", e])

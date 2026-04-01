@@ -8,8 +8,8 @@ from .base import ResourceProfile, InstanceConfig
 log = logging.getLogger(__name__)
 
 # Map (size, dim) -> default CPU, memory. Used when no custom manifest or overrides.
-# Milvus index build and querynode segment loading are memory-heavy; 8Gi is not enough for 10M HNSW
-# (segment_loader "OOM if load" / totalMemMB≈8192). Override in instance_config if your VM is smaller.
+# Milvus querynode: steady memUsage can be high; a single sealed segment can be ~2GiB+ to load
+# (predictMemUsage > memLimit at 32Gi). Use 64Gi for 10M unless you override downward.
 _SIZE_DIM_TO_PROFILE: dict[tuple[int, int], tuple[str, str]] = {
     (50_000, 1536): ("1", "4Gi"),
     (100_000, 768): ("2", "8Gi"),
@@ -19,9 +19,9 @@ _SIZE_DIM_TO_PROFILE: dict[tuple[int, int], tuple[str, str]] = {
     (1_000_000, 768): ("4", "16Gi"),
     (1_000_000, 1024): ("4", "16Gi"),
     (5_000_000, 1536): ("4", "16Gi"),
-    (10_000_000, 768): ("8", "32Gi"),
-    (10_000_000, 1024): ("8", "32Gi"),
-    (100_000_000, 768): ("8", "64Gi"),
+    (10_000_000, 768): ("12", "64Gi"),
+    (10_000_000, 1024): ("12", "64Gi"),
+    (100_000_000, 768): ("16", "128Gi"),
 }
 
 # Fallback when (size, dim) not in map
