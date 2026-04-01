@@ -73,6 +73,9 @@ class config:
     POST_PROVISION_SYNC_BEFORE_COOLDOWN = env.bool("POST_PROVISION_SYNC_BEFORE_COOLDOWN", False)
     # Max seconds to poll `docker inspect` until the container is gone after rm (clean handoff for host metrics).
     DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC = env.int("DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC", 120)
+    # Omit `docker run --memory`; container can grow until the host runs out of RAM (useful for heavy Milvus on VMs).
+    # Still obeys `--cpus` from resource_profile unless you override cpu in instance_config.
+    PROVISION_DOCKER_MEMORY_UNLIMITED = env.bool("PROVISION_DOCKER_MEMORY_UNLIMITED", False)
     # Cap ClickHouse threads per vector search query. Vector similarity index search can oversubscribe
     # the server when many benchmark clients run in parallel; this limits per-query parallelism.
     # Default 8; set to 0 to omit (use server defaults only).
