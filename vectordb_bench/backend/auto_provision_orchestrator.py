@@ -181,7 +181,7 @@ def run_with_auto_provision(
         )
         data_size = runners[0].ca.dataset.data.size
         dim = runners[0].ca.dataset.data.dim
-        resource_profile = get_resource_profile(data_size, dim, instance_config)
+        resource_profile = get_resource_profile(data_size, dim, instance_config, db=db)
 
         try:
             conn = provisioner.provision(

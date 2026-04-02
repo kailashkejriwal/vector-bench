@@ -9,7 +9,10 @@ from pydantic import SecretStr
 from vectordb_bench import config
 from vectordb_bench.backend.clients.pgvector.config import PgVectorConfig
 from vectordb_bench.backend.provisioning.base import ConnectionInfo
-from vectordb_bench.backend.provisioning.docker_base import DockerContainerProvisioner
+from vectordb_bench.backend.provisioning.docker_base import (
+    DockerContainerProvisioner,
+    _memory_for_docker,
+)
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +40,17 @@ class PgVectorDockerProvisioner(DockerContainerProvisioner):
         # Pin via PGVECTOR_DOCKER_IMAGE — :latest is often missing on Docker Hub.
         img = (config.PGVECTOR_DOCKER_IMAGE or "").strip()
         self.image = img or "pgvector/pgvector:pg16"
+
+    def _docker_shm_size_args(self) -> list[str]:
+        raw = (getattr(config, "PGVECTOR_DOCKER_SHM_SIZE", "") or "").strip()
+        if not raw or raw in {"0", "none", "off"}:
+            return []
+        size = _memory_for_docker(raw)
+        log.info(
+            "PgVector Docker: --shm-size=%s (parallel index builds need /dev/shm; Docker default 64m is too small)",
+            size,
+        )
+        return ["--shm-size", size]
 
     def _get_extra_container_args(self) -> list[str]:
         """Mount PGVECTOR_DATA_DIR to Postgres PGDATA when set (NVMe / persistence)."""

@@ -223,6 +223,10 @@ class DockerContainerProvisioner(Provisioner):
         """Override in subclasses to add e.g. volume mounts. Default: none."""
         return []
 
+    def _docker_shm_size_args(self) -> list[str]:
+        """Optional `--shm-size` for docker run (e.g. Postgres parallel CREATE INDEX uses /dev/shm)."""
+        return []
+
     def _run_container(
         self,
         resource_profile: ResourceProfile,
@@ -247,6 +251,9 @@ class DockerContainerProvisioner(Provisioner):
             )
         else:
             args.extend(["--memory", _memory_for_docker(resource_profile.memory)])
+        shm_args = self._docker_shm_size_args()
+        if shm_args:
+            args.extend(shm_args)
         if self.env:
             for e in self.env:
                 args.extend(["-e", e])

@@ -17,6 +17,20 @@ from .config import PgVectorConfigDict, PgVectorIndexConfig
 
 log = logging.getLogger(__name__)
 
+# pgvector registers pg_am names in lower case. sql.Identifier("HNSW") emits "HNSW", which is not the same AM as hnsw.
+_PGVECTOR_ACCESS_METHODS = frozenset({"hnsw", "ivfflat"})
+
+
+def _pgvector_access_method_sql(index_type_label: str) -> sql.SQL:
+    """Map shared IndexType strings (e.g. HNSW, IVF_FLAT) to pgvector USING names."""
+    key = index_type_label.lower().replace("_", "")
+    if key not in _PGVECTOR_ACCESS_METHODS:
+        key = index_type_label.lower()
+    if key not in _PGVECTOR_ACCESS_METHODS:
+        msg = f"PgVector unsupported index access method {index_type_label!r} (expected one of {sorted(_PGVECTOR_ACCESS_METHODS)})"
+        raise ValueError(msg)
+    return sql.SQL(key)
+
 
 class PgVector(VectorDB):
     """Use psycopg instructions"""
@@ -359,7 +373,7 @@ class PgVector(VectorDB):
                     if index_param["quantization_type"] == "bit"
                     else sql.Identifier("embedding")
                 ),
-                index_type=sql.Identifier(index_param["index_type"]),
+                index_type=_pgvector_access_method_sql(index_param["index_type"]),
                 # This assumes that the quantization_type value matches the quantization function name
                 quantization_type=sql.SQL(index_param["quantization_type"]),
                 dim=self.dim,
@@ -374,7 +388,7 @@ class PgVector(VectorDB):
             ).format(
                 index_name=sql.Identifier(self._index_name),
                 table_name=sql.Identifier(self.table_name),
-                index_type=sql.Identifier(index_param["index_type"]),
+                index_type=_pgvector_access_method_sql(index_param["index_type"]),
                 embedding_metric=sql.Identifier(index_param["metric"]),
             )
 
