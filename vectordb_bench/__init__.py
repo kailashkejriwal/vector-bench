@@ -65,6 +65,8 @@ class config:
     MILVUS_DATA_DIR = env.str("MILVUS_DATA_DIR", "")
     # Qdrant (Docker) storage on NVMe: mounts to /qdrant/storage in container
     QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
+    # REST API timeout for qdrant-client (seconds). Library default is 5s; create_collection can exceed that on slow disks.
+    QDRANT_CLIENT_TIMEOUT_SEC = env.int("QDRANT_CLIENT_TIMEOUT_SEC", 120)
     # PgVector (Docker): host path mounted to Postgres PGDATA for persistence / large disk (e.g. NVMe).
     PGVECTOR_DATA_DIR = env.str("PGVECTOR_DATA_DIR", "")
     # Image for auto-provisioned PgVector. Docker Hub often has no :latest; pin a pgNN tag.

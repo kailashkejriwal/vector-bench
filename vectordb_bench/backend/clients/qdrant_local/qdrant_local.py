@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from contextlib import contextmanager
 
 from qdrant_client import QdrantClient
+from qdrant_client.http.exceptions import ResponseHandlingException
 from qdrant_client.http.models import (
     Batch,
     CollectionStatus,
@@ -29,6 +30,25 @@ log = logging.getLogger(__name__)
 
 SECONDS_WAITING_FOR_INDEXING_API_CALL = 5
 QDRANT_BATCH_SIZE = 100
+_CREATE_COLLECTION_RETRIES = 5
+_CREATE_COLLECTION_RETRY_BASE_SEC = 2.0
+
+
+def _is_transient_qdrant_api_error(err: BaseException) -> bool:
+    msg = str(err).lower()
+    if isinstance(err, ResponseHandlingException):
+        return True
+    return any(
+        s in msg
+        for s in (
+            "disconnected",
+            "timeout",
+            "connection reset",
+            "connection refused",
+            "broken pipe",
+            "temporarily unavailable",
+        )
+    )
 
 
 def qdrant_collection_exists(client: QdrantClient, collection_name: str) -> bool:
@@ -113,38 +133,51 @@ class QdrantLocal(VectorDB):
         )
 
         # If the on_disk is true, we enable both on disk index and vectors.
-        try:
-            qdrant_client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config=VectorParams(
-                    size=dim,
-                    distance=self.case_config.index_param()["distance"],
-                    on_disk=self.case_config.index_param()["on_disk"],
-                ),
-                hnsw_config=HnswConfigDiff(
-                    m=self.case_config.index_param()["m"],
-                    ef_construct=self.case_config.index_param()["ef_construct"],
-                    on_disk=self.case_config.index_param()["on_disk"],
-                ),
-            )
-
-            qdrant_client.create_payload_index(
-                collection_name=self.collection_name,
-                field_name=self._primary_field,
-                field_schema=PayloadSchemaType.INTEGER,
-            )
-            if self.with_scalar_labels:
-                qdrant_client.create_payload_index(
+        ip = self.case_config.index_param()
+        for attempt in range(1, _CREATE_COLLECTION_RETRIES + 1):
+            try:
+                qdrant_client.create_collection(
                     collection_name=self.collection_name,
-                    field_name=self._scalar_label_field,
-                    field_schema=KeywordIndexParams(type=PayloadSchemaType.KEYWORD),
+                    vectors_config=VectorParams(
+                        size=dim,
+                        distance=ip["distance"],
+                        on_disk=ip["on_disk"],
+                    ),
+                    hnsw_config=HnswConfigDiff(
+                        m=ip["m"],
+                        ef_construct=ip["ef_construct"],
+                        on_disk=ip["on_disk"],
+                    ),
                 )
 
-        except Exception as e:
-            if "already exists!" in str(e):
+                qdrant_client.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=self._primary_field,
+                    field_schema=PayloadSchemaType.INTEGER,
+                )
+                if self.with_scalar_labels:
+                    qdrant_client.create_payload_index(
+                        collection_name=self.collection_name,
+                        field_name=self._scalar_label_field,
+                        field_schema=KeywordIndexParams(type=PayloadSchemaType.KEYWORD),
+                    )
                 return
-            log.warning(f"Failed to create collection: {self.collection_name} error: {e}")
-            raise e from None
+            except Exception as e:
+                if "already exists!" in str(e):
+                    return
+                if attempt < _CREATE_COLLECTION_RETRIES and _is_transient_qdrant_api_error(e):
+                    delay = _CREATE_COLLECTION_RETRY_BASE_SEC * attempt
+                    log.warning(
+                        "Qdrant create_collection attempt %s/%s failed (%s); retry in %.1fs",
+                        attempt,
+                        _CREATE_COLLECTION_RETRIES,
+                        e,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                log.warning("Failed to create collection: %s error: %s", self.collection_name, e)
+                raise e from None
 
     def optimize(self, data_size: int | None = None):
         assert self.client, "Please call self.init() before"

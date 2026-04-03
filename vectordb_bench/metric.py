@@ -20,6 +20,8 @@ class Metric:
 
     # for performance cases
     qps: float = 0.0
+    # Search latency from SerialSearchRunner (perf_counter deltas): stored as seconds in JSON / live runs.
+    # TestResult.read_file(..., trans_unit=True) multiplies these by 1000 for the results UI (ms).
     serial_latency_p99: float = 0.0
     serial_latency_p95: float = 0.0
     recall: float = 0.0
@@ -60,9 +62,10 @@ class Metric:
     read_qps: float = 0.0  # Read (search) QPS
     write_qps: float = 0.0  # Write (insert) QPS
     update_qps: float = 0.0  # Update QPS (if supported)
-    read_latency_p99: float = 0.0  # Read latency p99 (ms)
-    write_latency_p99: float = 0.0  # Write latency p99 (ms)
-    update_latency_p99: float = 0.0  # Update latency p99 (ms)
+    # Mirrored from serial path or other runners: seconds on disk / pre-trans_unit; ms after read_file(trans_unit=True).
+    read_latency_p99: float = 0.0
+    write_latency_p99: float = 0.0
+    update_latency_p99: float = 0.0
     read_throughput: float = 0.0  # Read throughput (queries/sec)
     write_throughput: float = 0.0  # Write throughput (inserts/sec)
     update_throughput: float = 0.0  # Update throughput (updates/sec)
@@ -112,6 +115,7 @@ CONCURRENCY_METRIC_KEYS = frozenset({
 
 metric_unit_map = {
     LOAD_DURATION_METRIC: "s",
+    # ms after TestResult.read_file(trans_unit=True); raw JSON is stored in seconds.
     SERIAL_LATENCY_P99_METRIC: "ms",
     SERIAL_LATENCY_P95_METRIC: "ms",
     MAX_LOAD_COUNT_METRIC: "K",
