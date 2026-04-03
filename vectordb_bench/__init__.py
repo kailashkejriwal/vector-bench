@@ -63,6 +63,11 @@ class config:
     CLICKHOUSE_DATA_DIR = env.str("CLICKHOUSE_DATA_DIR", "")
     # Milvus (Docker standalone) data on NVMe: mounts to /var/lib/milvus in container
     MILVUS_DATA_DIR = env.str("MILVUS_DATA_DIR", "")
+    # After TCP is open, querynode may not be registered yet (LoadCollection needs currentNodeNum>=1). 0 disables.
+    MILVUS_EXTRA_READINESS_WAIT_SEC = env.int("MILVUS_EXTRA_READINESS_WAIT_SEC", 10)
+    # Retry col.load() / load(refresh=True) when Milvus reports resource group / query node not ready.
+    MILVUS_LOAD_RETRY_MAX_ATTEMPTS = env.int("MILVUS_LOAD_RETRY_MAX_ATTEMPTS", 40)
+    MILVUS_LOAD_RETRY_INTERVAL_SEC = env.int("MILVUS_LOAD_RETRY_INTERVAL_SEC", 3)
     # Qdrant (Docker) storage on NVMe: mounts to /qdrant/storage in container
     QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
     # REST API timeout for qdrant-client (seconds). Library default is 5s; create_collection can exceed that on slow disks.
