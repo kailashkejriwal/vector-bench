@@ -1,6 +1,8 @@
 import sys
 import logging
+import os
 import pathlib
+import socket
 import subprocess
 import traceback
 
@@ -16,18 +18,34 @@ def main():
     run_streamlit()
 
 
+def _first_free_port(preferred: int, span: int = 20) -> int:
+    """Bind test so Streamlit does not fail immediately when the preferred port is taken."""
+    for port in range(preferred, preferred + span):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("0.0.0.0", port))
+                return port
+            except OSError:
+                continue
+    return preferred
+
+
 def run_streamlit():
     import sys
     venv_dir = pathlib.Path(sys.executable).parent.parent
     streamlit_path = venv_dir / "bin" / "streamlit"
+    preferred = int(os.environ.get("VDB_STREAMLIT_PORT", "8509"))
+    port = _first_free_port(preferred)
+    if port != preferred:
+        log.warning("Streamlit port %s in use; using %s (set VDB_STREAMLIT_PORT to force)", preferred, port)
     cmd = [
         str(streamlit_path),
         "run",
         f"{pathlib.Path(__file__).parent}/frontend/vdbbench.py",
-	"--server.address",
-	"0.0.0.0",
-	"--server.port",
-	"8502",
+        "--server.address",
+        "0.0.0.0",
+        "--server.port",
+        "8502",
         "--logger.level",
         "info",
         "--theme.base",

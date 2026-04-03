@@ -975,10 +975,10 @@ CaseConfigParamInput_EF_SEARCH_AliyunOpensearch = CaseConfigInput(
 CaseConfigParamInput_maintenance_work_mem_PgVector = CaseConfigInput(
     label=CaseConfigParamType.maintenance_work_mem,
     inputHelp="Recommended value: 1.33x the index size, not to exceed the available free memory."
-    "Specify in gigabytes. e.g. 8GB",
+    "Specify in gigabytes. e.g. 8GB. Default 2GB fits Docker auto-provision; raise for bare metal with more RAM.",
     inputType=InputType.Text,
     inputConfig={
-        "value": "8GB",
+        "value": "2GB",
     },
 )
 
@@ -986,12 +986,12 @@ CaseConfigParamInput_max_parallel_workers_PgVector = CaseConfigInput(
     label=CaseConfigParamType.max_parallel_workers,
     displayLabel="Max parallel workers",
     inputHelp="Recommended value: (cpu cores - 1). This will set the parameters: max_parallel_maintenance_workers,"
-    " max_parallel_workers & table(parallel_workers)",
+    " max_parallel_workers & table(parallel_workers). Default 4 fits typical Docker CPUs; raise on large servers.",
     inputType=InputType.Number,
     inputConfig={
         "min": 0,
         "max": 1024,
-        "value": 16,
+        "value": 4,
     },
 )
 

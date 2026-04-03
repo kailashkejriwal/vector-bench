@@ -1,14 +1,20 @@
 from pydantic import BaseModel, SecretStr
 
+from vectordb_bench import config
+
 from ..api import DBCaseConfig, DBConfig, MetricType
 
 
 class QdrantLocalConfig(DBConfig):
     url: SecretStr
+    # If None, QDRANT_CLIENT_TIMEOUT_SEC from env is used in to_dict()
+    timeout: int | None = None
 
     def to_dict(self) -> dict:
+        timeout = self.timeout if self.timeout is not None else int(config.QDRANT_CLIENT_TIMEOUT_SEC)
         return {
             "url": self.url.get_secret_value(),
+            **({"timeout": timeout} if timeout and timeout > 0 else {}),
         }
 
 

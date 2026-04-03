@@ -27,6 +27,23 @@ from vectordb_bench.models import (
 log = logging.getLogger(__name__)
 
 
+def _merge_provisioned_db_config(db: DB, provisioned: object, previous: object) -> object:
+    """Keep UI-supplied fields that Docker provision does not set (e.g. PgVector table_name)."""
+    if previous is None:
+        return provisioned
+    updates: dict = {}
+    prev_label = getattr(previous, "db_label", None)
+    if prev_label:
+        updates["db_label"] = prev_label
+    if db == DB.PgVector:
+        prev_table = getattr(previous, "table_name", None)
+        if prev_table:
+            updates["table_name"] = prev_table
+    if not updates:
+        return provisioned
+    return provisioned.copy(update=updates)
+
+
 def _next_db_after_auto_teardown(
     db_idx: int,
     sorted_auto_items: list[tuple[DB, list[CaseRunner]]],
@@ -164,7 +181,7 @@ def run_with_auto_provision(
         )
         data_size = runners[0].ca.dataset.data.size
         dim = runners[0].ca.dataset.data.dim
-        resource_profile = get_resource_profile(data_size, dim, instance_config)
+        resource_profile = get_resource_profile(data_size, dim, instance_config, db=db)
 
         try:
             conn = provisioner.provision(
@@ -173,6 +190,7 @@ def run_with_auto_provision(
                 context={"db": db, "data_size": data_size, "dim": dim},
             )
             new_db_config = connection_info_to_db_config(db, conn)
+            new_db_config = _merge_provisioned_db_config(db, new_db_config, runners[0].config.db_config)
         except Exception as e:
             log.warning(f"Provision failed for {db}: {e}", exc_info=True)
             for r in runners:

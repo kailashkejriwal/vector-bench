@@ -17,6 +17,20 @@ from .config import PgVectorConfigDict, PgVectorIndexConfig
 
 log = logging.getLogger(__name__)
 
+# pgvector registers pg_am names in lower case. sql.Identifier("HNSW") emits "HNSW", which is not the same AM as hnsw.
+_PGVECTOR_ACCESS_METHODS = frozenset({"hnsw", "ivfflat"})
+
+
+def _pgvector_access_method_sql(index_type_label: str) -> sql.SQL:
+    """Map shared IndexType strings (e.g. HNSW, IVF_FLAT) to pgvector USING names."""
+    key = index_type_label.lower().replace("_", "")
+    if key not in _PGVECTOR_ACCESS_METHODS:
+        key = index_type_label.lower()
+    if key not in _PGVECTOR_ACCESS_METHODS:
+        msg = f"PgVector unsupported index access method {index_type_label!r} (expected one of {sorted(_PGVECTOR_ACCESS_METHODS)})"
+        raise ValueError(msg)
+    return sql.SQL(key)
+
 
 class PgVector(VectorDB):
     """Use psycopg instructions"""
@@ -53,12 +67,8 @@ class PgVector(VectorDB):
         self._vector_field = "embedding"
         self._scalar_label_field = "label"
 
-        # construct basic units
+        # construct basic units (extension + register_vector happen in _create_connection)
         self.conn, self.cursor = self._create_connection(**self.connect_config)
-
-        # create vector extension
-        self.cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        self.conn.commit()
 
         log.info(f"{self.name} config values: {self.connect_config}\n{self.case_config}")
         if not any(
@@ -89,8 +99,12 @@ class PgVector(VectorDB):
     @staticmethod
     def _create_connection(**kwargs) -> tuple[Connection, Cursor]:
         conn = psycopg.connect(**kwargs)
-        register_vector(conn)
+        # register_vector() inspects pg_type; CREATE EXTENSION must run first on a fresh DB.
+        conn.autocommit = True
+        with conn.cursor() as setup_cur:
+            setup_cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
         conn.autocommit = False
+        register_vector(conn)
         cursor = conn.cursor()
 
         assert conn is not None, "Connection is not initialized"
@@ -359,7 +373,7 @@ class PgVector(VectorDB):
                     if index_param["quantization_type"] == "bit"
                     else sql.Identifier("embedding")
                 ),
-                index_type=sql.Identifier(index_param["index_type"]),
+                index_type=_pgvector_access_method_sql(index_param["index_type"]),
                 # This assumes that the quantization_type value matches the quantization function name
                 quantization_type=sql.SQL(index_param["quantization_type"]),
                 dim=self.dim,
@@ -374,7 +388,7 @@ class PgVector(VectorDB):
             ).format(
                 index_name=sql.Identifier(self._index_name),
                 table_name=sql.Identifier(self.table_name),
-                index_type=sql.Identifier(index_param["index_type"]),
+                index_type=_pgvector_access_method_sql(index_param["index_type"]),
                 embedding_metric=sql.Identifier(index_param["metric"]),
             )
 

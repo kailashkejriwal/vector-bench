@@ -389,6 +389,12 @@ class TestResult(BaseModel):
                     else:
                         # Default to 0 for older result files that don't have P95 data
                         case_result["metrics"]["serial_latency_p95"] = 0.0
+
+                    # Same seconds→ms as serial_* (written from the same Measurement)
+                    for _lat_key in ("read_latency_p99", "write_latency_p99", "update_latency_p99"):
+                        if _lat_key in case_result["metrics"]:
+                            v = case_result["metrics"][_lat_key]
+                            case_result["metrics"][_lat_key] = v * 1000 if v and v > 0 else v
             return TestResult.validate(test_result)
 
     def display(self, dbs: list[DB] | None = None):
@@ -450,8 +456,8 @@ class TestResult(BaseModel):
             "label",
             "load_dur",
             "qps",
-            "latency(p99)",
-            "latency(p95)",
+            "lat_p99(s)",
+            "lat_p95(s)",
             "recall",
             "max_load_count",
             "label",
