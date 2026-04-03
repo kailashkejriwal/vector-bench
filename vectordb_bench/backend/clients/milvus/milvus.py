@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, MilvusException, utility
 
+from vectordb_bench import config
 from vectordb_bench.backend.filter import Filter, FilterOp
 
 from ..api import VectorDB
@@ -15,6 +16,47 @@ from .config import MilvusIndexConfig
 log = logging.getLogger(__name__)
 
 MILVUS_LOAD_REQS_SIZE = 1.5 * 1024 * 1024
+
+
+def _milvus_transient_load_error(exc: MilvusException) -> bool:
+    msg = str(exc).lower()
+    return any(
+        s in msg
+        for s in (
+            "resource group node not enough",
+            "currentnodenum=0",
+            "expectednodenum",
+        )
+    )
+
+
+def _collection_load_with_retry(
+    col: Collection,
+    *,
+    replica_number: int | None = None,
+    refresh: bool = False,
+) -> None:
+    """Standalone Milvus may accept gRPC before querynode registers; LoadCollection then fails transiently."""
+    max_attempts = max(1, int(getattr(config, "MILVUS_LOAD_RETRY_MAX_ATTEMPTS", 40)))
+    interval = max(1, int(getattr(config, "MILVUS_LOAD_RETRY_INTERVAL_SEC", 3)))
+    for attempt in range(1, max_attempts + 1):
+        try:
+            if refresh:
+                col.load(refresh=True)
+            else:
+                col.load(replica_number=1 if replica_number is None else replica_number)
+            return
+        except MilvusException as e:
+            if _milvus_transient_load_error(e) and attempt < max_attempts:
+                log.warning(
+                    "Milvus load retry %s/%s (waiting for query nodes): %s",
+                    attempt,
+                    max_attempts,
+                    e,
+                )
+                time.sleep(float(interval))
+                continue
+            raise
 
 
 class Milvus(VectorDB):
@@ -92,7 +134,7 @@ class Milvus(VectorDB):
             )
 
             self.create_index()
-            col.load(replica_number=self.db_config.get("replica_number", 1))
+            _collection_load_with_retry(col, replica_number=self.db_config.get("replica_number", 1))
 
         connections.disconnect("default")
 
@@ -145,7 +187,7 @@ class Milvus(VectorDB):
         log.info(f"{self.name} optimizing before search")
         self._post_insert()
         try:
-            self.col.load(refresh=True)
+            _collection_load_with_retry(self.col, refresh=True)
         except Exception as e:
             log.warning(f"{self.name} optimize error: {e}")
             raise e from None

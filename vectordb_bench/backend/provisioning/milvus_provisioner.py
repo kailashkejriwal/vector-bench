@@ -2,6 +2,7 @@
 
 import logging
 import pathlib
+import time
 
 from pydantic import SecretStr
 
@@ -25,6 +26,16 @@ class MilvusDockerProvisioner(DockerContainerProvisioner):
     env = ["ETCD_USE_EMBED=true", "COMMON_STORAGETYPE=local", "DEPLOY_MODE=STANDALONE"]
     # Image entrypoint is tini; must pass the actual server command (see milvus.io/docs install_standalone-docker)
     command = ["milvus", "run", "standalone"]
+
+    def _wait_until_ready(self, host: str, port: int, timeout_sec: int = 600) -> None:
+        super()._wait_until_ready(host, port, timeout_sec)
+        extra = int(getattr(config, "MILVUS_EXTRA_READINESS_WAIT_SEC", 0) or 0)
+        if extra > 0:
+            log.info(
+                "Milvus provisioner: waiting %ss after TCP bind for querynode / coordinator (avoid LoadCollection race)",
+                extra,
+            )
+            time.sleep(extra)
 
     def _get_extra_container_args(self) -> list[str]:
         """Mount MILVUS_DATA_DIR to /var/lib/milvus when set (e.g. NVMe disk)."""
