@@ -91,7 +91,9 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
     ),
     BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC: (
         "DB host data dir — net growth during this case: bytes after minus bytes before (floored at 0). "
-        "Approximates how much was stored under that directory for this run; uses recursive size on disk."
+        "Approximates how much was stored under that directory for this run. "
+        "Sizing uses du/walk as the bench user, then sudo/docker du if the directory is root-only (typical ClickHouse/Postgres bind mounts). "
+        "Zeros usually mean CLICKHOUSE_DATA_DIR/PGVECTOR_DATA_DIR was unset, the path was empty, or elevated du failed."
     ),
     BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC: (
         "DB host data dir — total bytes on disk at case start (recursive)."
