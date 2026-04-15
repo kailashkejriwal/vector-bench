@@ -90,6 +90,9 @@ class config:
     # Omit `docker run --memory`; container can grow until the host runs out of RAM (useful for heavy Milvus on VMs).
     # Still obeys `--cpus` from resource_profile unless you override cpu in instance_config.
     PROVISION_DOCKER_MEMORY_UNLIMITED = env.bool("PROVISION_DOCKER_MEMORY_UNLIMITED", False)
+    # After auto-provision Docker teardown (not leave_container_running), delete CLICKHOUSE/MILVUS/QDRANT/PGVECTOR
+    # host data dirs so disk metrics return to baseline. Never deletes DATASET_LOCAL_DIR or RESULTS_LOCAL_DIR.
+    PROVISION_CLEAR_HOST_DATA_AFTER_RUN = env.bool("PROVISION_CLEAR_HOST_DATA_AFTER_RUN", True)
     # Cap ClickHouse threads per vector search query. Vector similarity index search can oversubscribe
     # the server when many benchmark clients run in parallel; this limits per-query parallelism.
     # Default 8; set to 0 to omit (use server defaults only).

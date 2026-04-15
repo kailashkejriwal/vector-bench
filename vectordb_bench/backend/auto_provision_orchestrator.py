@@ -12,6 +12,7 @@ from vectordb_bench.backend.provisioning import (
     get_provisioner,
 )
 from vectordb_bench.backend.provisioning.base import InstanceConfig
+from vectordb_bench.backend.provisioning.host_data_cleanup import clear_auto_provision_host_data_dir
 from vectordb_bench.backend.provisioning.resource_profiles import get_resource_profile
 from vectordb_bench.backend.task_runner import CaseRunner
 from vectordb_bench.metric import Metric
@@ -222,6 +223,11 @@ def run_with_auto_provision(
                         db.name,
                     )
                 provisioner.teardown(leave_running=leave_running)
+                if (
+                    not leave_running
+                    and getattr(config, "PROVISION_CLEAR_HOST_DATA_AFTER_RUN", False)
+                ):
+                    clear_auto_provision_host_data_dir(db)
             except Exception as e:
                 log.warning(f"Teardown failed for {db}: {e}")
             gap = config.POST_PROVISION_TEARDOWN_DELAY_SEC
