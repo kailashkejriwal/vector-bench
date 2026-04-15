@@ -17,6 +17,16 @@ from .config import ClickhouseConfigDict, ClickhouseIndexConfig
 log = logging.getLogger(__name__)
 
 
+def _clickhouse_thread_cap_settings(base: dict | None = None) -> dict:
+    """Cap max_threads / merge_tree_max_threads to avoid vector-similarity 'Too many threads' under load."""
+    out = dict(base or {})
+    mt = int(getattr(config, "CLICKHOUSE_QUERY_MAX_THREADS", 0) or 0)
+    if mt > 0:
+        out["max_threads"] = mt
+        out["merge_tree_max_threads"] = mt
+    return out
+
+
 class Clickhouse(VectorDB):
     """ClickHouse vector DB client using native protocol (clickhouse-driver) for faster inserts."""
 
@@ -96,6 +106,7 @@ class Clickhouse(VectorDB):
             self.conn = None
 
     def _create_connection(self) -> NativeClient:
+        settings = _clickhouse_thread_cap_settings(self.session_param)
         return NativeClient(
             host=self.db_config["host"],
             port=self.db_config["port"],
@@ -103,7 +114,7 @@ class Clickhouse(VectorDB):
             user=self.db_config["user"],
             password=self.db_config["password"],
             secure=self.db_config.get("secure", False),
-            settings=self.session_param,
+            settings=settings,
         )
 
     def _drop_index(self):
@@ -336,12 +347,8 @@ class Clickhouse(VectorDB):
             params["label_val"] = label_val
 
         exec_kwargs: dict[str, Any] = {}
-        mt = int(getattr(config, "CLICKHOUSE_QUERY_MAX_THREADS", 0) or 0)
-        if mt > 0:
-            # merge_tree_max_threads also bounds parallel part reads; vector index search touches MergeTree paths.
-            exec_kwargs["settings"] = {
-                "max_threads": mt,
-                "merge_tree_max_threads": mt,
-            }
+        capped = _clickhouse_thread_cap_settings()
+        if capped:
+            exec_kwargs["settings"] = {k: capped[k] for k in ("max_threads", "merge_tree_max_threads") if k in capped}
         result = self.conn.execute(sql, params, **exec_kwargs)
         return [int(row[0]) for row in result]

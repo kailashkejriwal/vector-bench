@@ -93,10 +93,13 @@ class config:
     # Before each auto-provision start and after teardown (unless leave_container_running), delete
     # CLICKHOUSE/MILVUS/QDRANT/PGVECTOR host data dirs for a clean baseline. Never deletes DATASET_LOCAL_DIR or RESULTS_LOCAL_DIR.
     PROVISION_CLEAR_HOST_DATA_AFTER_RUN = env.bool("PROVISION_CLEAR_HOST_DATA_AFTER_RUN", True)
-    # Cap ClickHouse threads per vector search query. Vector similarity index search can oversubscribe
-    # the server when many benchmark clients run in parallel; this limits per-query parallelism.
-    # Default 8; set to 0 to omit (use server defaults only).
-    CLICKHOUSE_QUERY_MAX_THREADS = env.int("CLICKHOUSE_QUERY_MAX_THREADS", 8)
+    # If rmtree hits permission denied (Docker leaves root-owned files on bind mounts), retry after
+    # `sudo -n chown -R <uid>:<gid>` (needs passwordless sudo for chown on that path, or run bench as root).
+    PROVISION_CLEAR_HOST_DATA_SUDO_CHOWN = env.bool("PROVISION_CLEAR_HOST_DATA_SUDO_CHOWN", True)
+    # Cap ClickHouse max_threads / merge_tree_max_threads on every native connection and vector searches.
+    # Experimental vector similarity can hit "Too many threads" if this is high and NUM_CONCURRENCY is large.
+    # Default 2; set to 1 if errors persist; set 0 to omit (server defaults only — may fail under concurrency).
+    CLICKHOUSE_QUERY_MAX_THREADS = env.int("CLICKHOUSE_QUERY_MAX_THREADS", 2)
 
     K_DEFAULT = 100  # default return top k nearest neighbors during search
     CUSTOM_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("custom/custom_case.json")
