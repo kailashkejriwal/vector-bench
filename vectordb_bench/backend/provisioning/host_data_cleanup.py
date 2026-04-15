@@ -1,4 +1,4 @@
-"""Remove host-mounted Docker DB data after auto-provision teardown (disk metrics baseline).
+"""Remove host-mounted Docker DB data before provision and after teardown (auto-provision only).
 
 Dataset downloads (DATASET_LOCAL_DIR) are never touched.
 """
@@ -66,8 +66,10 @@ def _raw_dir_for_db(db: DB) -> str:
     return (mapping.get(db) or "").strip()
 
 
-def clear_auto_provision_host_data_dir(db: DB) -> None:
-    """Delete contents of the configured host data dir for this DB, then recreate an empty directory.
+def clear_auto_provision_host_data_dir(db: DB, *, phase: str = "post-run") -> None:
+    """Delete the configured host data dir for this DB (if it exists), then recreate an empty directory.
+
+    For ``phase="pre-provision"``, if the path does not exist yet, only ``mkdir`` is performed so Docker can bind-mount.
 
     No-op if PROVISION_CLEAR_HOST_DATA_AFTER_RUN is false, path unset, or safety checks fail.
     """
@@ -76,7 +78,7 @@ def clear_auto_provision_host_data_dir(db: DB) -> None:
 
     raw = _raw_dir_for_db(db)
     if not raw:
-        log.debug("No host data dir configured for %s; skip post-run cleanup", db.name)
+        log.debug("No host data dir configured for %s; skip %s cleanup", db.name, phase)
         return
 
     data_path = pathlib.Path(raw)
@@ -86,14 +88,23 @@ def clear_auto_provision_host_data_dir(db: DB) -> None:
         return
 
     resolved = _resolved(data_path)
+    label = "Pre-provision" if phase == "pre-provision" else "Post-run"
+
     if not resolved.exists():
-        log.debug("Host data dir does not exist; skip: %s", resolved)
+        if phase == "pre-provision":
+            try:
+                resolved.mkdir(parents=True, exist_ok=True)
+                log.info("Pre-provision: created empty data dir %s", resolved)
+            except OSError as e:
+                log.warning("Pre-provision: could not create data dir %s: %s", resolved, e)
+        else:
+            log.debug("Host data dir does not exist; skip post-run cleanup: %s", resolved)
         return
 
-    log.info("Post-run cleanup: removing host data dir for %s → %s", db.name, resolved)
+    log.info("%s cleanup: removing host data dir for %s → %s", label, db.name, resolved)
     try:
         shutil.rmtree(resolved)
         resolved.mkdir(parents=True, exist_ok=True)
-        log.info("Post-run cleanup: recreated empty dir %s", resolved)
+        log.info("%s cleanup: recreated empty dir %s", label, resolved)
     except OSError as e:
-        log.warning("Post-run cleanup failed for %s (%s): %s", db.name, resolved, e)
+        log.warning("%s cleanup failed for %s (%s): %s", label, db.name, resolved, e)
