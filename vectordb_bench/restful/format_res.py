@@ -1,12 +1,13 @@
 from dataclasses import asdict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from vectordb_bench.backend.cases import CaseLabel
 from vectordb_bench.models import TestResult
 
 
 class FormatResult(BaseModel):
+    model_config = ConfigDict(extra="allow")
     # db_config
     task_label: str = ""
     timestamp: int = 0

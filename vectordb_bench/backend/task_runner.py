@@ -12,6 +12,7 @@ from ..base import BaseModel
 from ..metric import Metric
 from ..models import PerformanceTimeoutError, TaskConfig, TaskStage
 from . import utils
+from .bench_disk_usage import apply_disk_usage_sample
 from .cases import Case, CaseLabel, StreamingPerformanceCase
 from .clients import DB, MetricType, api
 from .data_source import DatasetSource
@@ -162,6 +163,8 @@ class CaseRunner(BaseModel):
         """
         assert self.db is not None
         log.info("Start capacity case")
+        m = Metric()
+        apply_disk_usage_sample(m, self.config.db, phase="begin")
         try:
             runner = SerialInsertRunner(
                 self.db,
@@ -175,8 +178,10 @@ class CaseRunner(BaseModel):
             log.warning(f"Failed to run capacity case, reason = {e}")
             raise e from None
         else:
+            apply_disk_usage_sample(m, self.config.db, phase="end")
+            m.max_load_count = count
             log.info(f"Capacity case loading dataset reaches VectorDB's limit: max capacity = {count}")
-            return Metric(max_load_count=count)
+            return m
 
     def _run_perf_case(self, drop_old: bool = True) -> Metric:
         """run performance cases
@@ -190,6 +195,7 @@ class CaseRunner(BaseModel):
         monitor.start_monitoring()
         try:
             m = Metric()
+            apply_disk_usage_sample(m, self.config.db, phase="begin")
             num_inserts = 0
             load_dur = 0.0
             if drop_old:
@@ -245,12 +251,18 @@ class CaseRunner(BaseModel):
             m.peak_memory_usage = resource_metrics.get('peak_memory_usage', 0.0)
             m.disk_read_bytes = resource_metrics.get('disk_read_bytes', 0)
             m.disk_write_bytes = resource_metrics.get('disk_write_bytes', 0)
+            apply_disk_usage_sample(m, self.config.db, phase="end")
 
     def _run_streaming_case(self) -> Metric:
         log.info("Start streaming case")
         try:
             self._init_read_write_runner()
+            m0 = Metric()
+            apply_disk_usage_sample(m0, self.config.db, phase="begin")
             m = self.read_write_runner.run_read_write()
+            m.bench_db_host_data_dir_path = m0.bench_db_host_data_dir_path
+            m.bench_db_host_data_dir_bytes_begin = m0.bench_db_host_data_dir_bytes_begin
+            apply_disk_usage_sample(m, self.config.db, phase="end")
         except Exception as e:
             log.warning(f"Failed to run streaming case, reason = {e}")
             traceback.print_exc()

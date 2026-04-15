@@ -58,6 +58,12 @@ class Metric:
     disk_read_bytes: int = 0  # Total disk read bytes
     disk_write_bytes: int = 0  # Total disk write bytes
 
+    # Host DB data dir only (CLICKHOUSE_DATA_DIR / MILVUS_DATA_DIR / QDRANT_DATA_DIR / PGVECTOR_DATA_DIR).
+    bench_db_host_data_dir_path: str = ""
+    bench_db_host_data_dir_bytes_begin: int = 0
+    bench_db_host_data_dir_bytes_end: int = 0
+    bench_db_host_data_dir_bytes_written: int = 0  # max(0, end - begin) for this case
+
     # New: Detailed query efficiency metrics
     read_qps: float = 0.0  # Read (search) QPS
     write_qps: float = 0.0  # Write (insert) QPS
@@ -84,6 +90,10 @@ AVG_MEMORY_USAGE_METRIC = "avg_memory_usage"
 PEAK_MEMORY_USAGE_METRIC = "peak_memory_usage"
 DISK_READ_BYTES_METRIC = "disk_read_bytes"
 DISK_WRITE_BYTES_METRIC = "disk_write_bytes"
+BENCH_DB_HOST_DATA_DIR_PATH_METRIC = "bench_db_host_data_dir_path"
+BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC = "bench_db_host_data_dir_bytes_begin"
+BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC = "bench_db_host_data_dir_bytes_end"
+BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC = "bench_db_host_data_dir_bytes_written"
 READ_QPS_METRIC = "read_qps"
 WRITE_QPS_METRIC = "write_qps"
 UPDATE_QPS_METRIC = "update_qps"
@@ -126,6 +136,10 @@ metric_unit_map = {
     PEAK_MEMORY_USAGE_METRIC: "MB",
     DISK_READ_BYTES_METRIC: "bytes",
     DISK_WRITE_BYTES_METRIC: "bytes",
+    BENCH_DB_HOST_DATA_DIR_PATH_METRIC: "",
+    BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC: "bytes",
+    BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC: "bytes",
+    BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC: "bytes",
     READ_QPS_METRIC: "qps",
     WRITE_QPS_METRIC: "qps",
     UPDATE_QPS_METRIC: "qps",
@@ -175,6 +189,10 @@ metric_order = [
     PEAK_MEMORY_USAGE_METRIC,
     DISK_READ_BYTES_METRIC,
     DISK_WRITE_BYTES_METRIC,
+    BENCH_DB_HOST_DATA_DIR_PATH_METRIC,
+    BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC,
+    BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC,
+    BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC,
     READ_QPS_METRIC,
     WRITE_QPS_METRIC,
     UPDATE_QPS_METRIC,
