@@ -65,12 +65,48 @@ def _permission_denied(exc: OSError) -> bool:
     return exc.errno in (errno.EACCES, errno.EPERM)
 
 
+def _chown_mount_via_docker(host_path: pathlib.Path, *, label: str) -> bool:
+    """chown bind-mounted dir to bench uid/gid via a root process in docker (no host sudo needed)."""
+    if not getattr(config, "PROVISION_CLEAR_HOST_DATA_DOCKER_CHOWN_FALLBACK", True):
+        return False
+    if os.name == "nt":
+        return False
+    mount = "/vectordb_bench_cleanup"
+    uid = os.getuid()
+    gid = os.getgid()
+    cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{host_path}:{mount}:rw",
+        "alpine:3.20",
+        "chown",
+        "-R",
+        f"{uid}:{gid}",
+        mount,
+    ]
+    log.info("%s: fixing ownership via docker chown → %s", label, host_path)
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    except FileNotFoundError:
+        log.debug("%s: docker not found for chown of %s", label, host_path)
+        return False
+    except subprocess.TimeoutExpired:
+        log.warning("%s: docker chown timed out for %s", label, host_path)
+        return False
+    if r.returncode != 0:
+        err = (r.stderr or r.stdout or "").strip()
+        log.debug("%s: docker chown failed for %s: %s", label, host_path, err or r.returncode)
+        return False
+    return True
+
+
 def _chown_mount_to_process_user(host_path: pathlib.Path, *, label: str) -> bool:
-    """Recursively chown the data dir to the bench uid/gid so rmtree can run (needs root: sudo or euid 0)."""
+    """Recursively chown the data dir to the bench uid/gid (host chown, sudo -n, or euid 0)."""
     if not getattr(config, "PROVISION_CLEAR_HOST_DATA_SUDO_CHOWN", True):
         return False
     if os.name == "nt":
-        log.warning("%s: host chown fallback not supported on Windows for %s", label, host_path)
         return False
 
     uid = os.getuid()
@@ -83,27 +119,36 @@ def _chown_mount_to_process_user(host_path: pathlib.Path, *, label: str) -> bool
     if is_root:
         cmd = ["chown", "-R", f"{uid}:{gid}", hp]
     else:
+        log.info("%s: fixing ownership via sudo chown → %s", label, host_path)
         cmd = ["sudo", "-n", "chown", "-R", f"{uid}:{gid}", hp]
 
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     except FileNotFoundError:
-        log.warning("%s: chown/sudo not found; cannot fix ownership of %s", label, host_path)
+        log.debug("%s: chown/sudo not found for %s", label, host_path)
         return False
     except subprocess.TimeoutExpired:
         log.warning("%s: chown timed out for %s", label, host_path)
         return False
     if r.returncode != 0:
         err = (r.stderr or r.stdout or "").strip()
-        log.warning(
-            "%s: chown failed for %s (%s). For non-root bench user, allow passwordless sudo for "
-            "`chown -R` on DB data dirs (e.g. /mnt/disks/.../vectordb_bench/*_data).",
-            label,
-            host_path,
-            err or f"exit {r.returncode}",
-        )
+        log.debug("%s: sudo chown failed for %s: %s", label, host_path, err or r.returncode)
         return False
     return True
+
+
+def _fix_ownership_for_rmtree(host_path: pathlib.Path, *, label: str) -> bool:
+    """So non-root bench user can rmtree root-owned bind-mount data: docker chown, then sudo chown."""
+    if _chown_mount_via_docker(host_path, label=label):
+        return True
+    if _chown_mount_to_process_user(host_path, label=label):
+        return True
+    log.warning(
+        "%s: could not fix ownership of %s (enable docker for user or passwordless sudo for chown on DB data dirs)",
+        label,
+        host_path,
+    )
+    return False
 
 
 def _raw_dir_for_db(db: DB) -> str:
@@ -157,22 +202,24 @@ def clear_auto_provision_host_data_dir(db: DB, *, phase: str = "post-run") -> No
         resolved.mkdir(parents=True, exist_ok=True)
         log.info("%s cleanup: recreated empty dir %s", label, resolved)
     except OSError as e:
-        if _permission_denied(e) and _chown_mount_to_process_user(resolved, label=label):
-            try:
-                shutil.rmtree(resolved)
-                resolved.mkdir(parents=True, exist_ok=True)
-                log.info(
-                    "%s cleanup: recreated empty dir %s (after chown)",
-                    label,
-                    resolved,
-                )
-            except OSError as e2:
-                log.warning(
-                    "%s cleanup failed for %s (%s) after chown: %s",
-                    label,
-                    db.name,
-                    resolved,
-                    e2,
-                )
+        if _permission_denied(e):
+            if _fix_ownership_for_rmtree(resolved, label=label):
+                try:
+                    shutil.rmtree(resolved)
+                    resolved.mkdir(parents=True, exist_ok=True)
+                    log.info(
+                        "%s cleanup: recreated empty dir %s (after ownership fix)",
+                        label,
+                        resolved,
+                    )
+                except OSError as e2:
+                    log.warning(
+                        "%s cleanup failed for %s (%s) after ownership fix: %s",
+                        label,
+                        db.name,
+                        resolved,
+                        e2,
+                    )
+            # else: _fix_ownership_for_rmtree already logged
         else:
             log.warning("%s cleanup failed for %s (%s): %s", label, db.name, resolved, e)

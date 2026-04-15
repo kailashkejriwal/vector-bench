@@ -93,8 +93,9 @@ class config:
     # Before each auto-provision start and after teardown (unless leave_container_running), delete
     # CLICKHOUSE/MILVUS/QDRANT/PGVECTOR host data dirs for a clean baseline. Never deletes DATASET_LOCAL_DIR or RESULTS_LOCAL_DIR.
     PROVISION_CLEAR_HOST_DATA_AFTER_RUN = env.bool("PROVISION_CLEAR_HOST_DATA_AFTER_RUN", True)
-    # If rmtree hits permission denied (Docker leaves root-owned files on bind mounts), retry after
-    # `sudo -n chown -R <uid>:<gid>` (needs passwordless sudo for chown on that path, or run bench as root).
+    # If rmtree hits permission denied (containers leave root-owned files on bind mounts), fix ownership then retry.
+    # Try docker chown first (typical VM: user in docker group, no sudoers change). Then sudo -n chown if still needed.
+    PROVISION_CLEAR_HOST_DATA_DOCKER_CHOWN_FALLBACK = env.bool("PROVISION_CLEAR_HOST_DATA_DOCKER_CHOWN_FALLBACK", True)
     PROVISION_CLEAR_HOST_DATA_SUDO_CHOWN = env.bool("PROVISION_CLEAR_HOST_DATA_SUDO_CHOWN", True)
     # Cap ClickHouse max_threads / merge_tree_max_threads on every native connection and vector searches.
     # Experimental vector similarity can hit "Too many threads" if this is high and NUM_CONCURRENCY is large.
