@@ -6,6 +6,10 @@ Used by check_results/charts.py to add help text and group metrics under heading
 from vectordb_bench.metric import (
     AVG_CPU_USAGE_METRIC,
     AVG_MEMORY_USAGE_METRIC,
+    BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC,
+    BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC,
+    BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC,
+    BENCH_DB_HOST_DATA_DIR_PATH_METRIC,
     DISK_READ_BYTES_METRIC,
     DISK_WRITE_BYTES_METRIC,
     INSERT_DURATION_METRIC,
@@ -80,6 +84,20 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
     DISK_WRITE_BYTES_METRIC: (
         "Disk write: Total bytes written to disk during the run. "
         "Lower is better; reflects index build and compaction I/O."
+    ),
+    BENCH_DB_HOST_DATA_DIR_PATH_METRIC: (
+        "Host path for this database’s on-disk files only (Docker bind mount), e.g. CLICKHOUSE_DATA_DIR. "
+        "Not the dataset or results dirs. Empty when the DB has no such env path set."
+    ),
+    BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC: (
+        "DB host data dir — net growth during this case: bytes after minus bytes before (floored at 0). "
+        "Approximates how much was stored under that directory for this run; uses recursive size on disk."
+    ),
+    BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC: (
+        "DB host data dir — total bytes on disk at case start (recursive)."
+    ),
+    BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC: (
+        "DB host data dir — total bytes on disk when the case finishes (recursive)."
     ),
     READ_QPS_METRIC: (
         "Read QPS: Search (read) queries per second. Higher is better. Same as QPS in search benchmarks."
@@ -158,6 +176,10 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
             PEAK_MEMORY_USAGE_METRIC,
             DISK_READ_BYTES_METRIC,
             DISK_WRITE_BYTES_METRIC,
+            BENCH_DB_HOST_DATA_DIR_PATH_METRIC,
+            BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC,
+            BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC,
+            BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC,
         ],
     ),
     (
@@ -185,6 +207,10 @@ RESULTS_METRIC_DISPLAY_NAMES: dict[str, str] = {
     INSERT_DURATION_METRIC: "Insert duration",
     OPTIMIZE_DURATION_METRIC: "Optimize duration",
     NDCG_METRIC: "NDCG",
+    BENCH_DB_HOST_DATA_DIR_PATH_METRIC: "DB host data dir path",
+    BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC: "DB data dir bytes written",
+    BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC: "DB data dir (bytes, start)",
+    BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC: "DB data dir (bytes, end)",
 }
 
 
