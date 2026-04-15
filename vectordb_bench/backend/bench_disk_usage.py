@@ -33,26 +33,29 @@ def configured_host_db_data_dir(db: DB) -> pathlib.Path | None:
         return None
 
 
-def directory_size_bytes(path: pathlib.Path) -> int:
-    """Recursive size under ``path`` (sum of file lengths; dirs/metadata approximated by du when available)."""
-    if not path.exists():
-        return 0
+def _du_sb_subprocess(path: pathlib.Path, cmd: list[str]) -> int:
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if r.returncode == 0 and r.stdout:
+            return int(r.stdout.split()[0])
+    except (ValueError, subprocess.TimeoutExpired, FileNotFoundError, IndexError, OSError):
+        pass
+    return 0
+
+
+def _du_user(path: pathlib.Path) -> int:
     du_bin = os.environ.get("BENCHMARK_DISK_USAGE_DU_PATH", "").strip() or None
     candidates = [du_bin] if du_bin else ["du"]
     for du_cmd in candidates:
         if not du_cmd:
             continue
-        try:
-            r = subprocess.run(
-                [du_cmd, "-sb", str(path)],
-                capture_output=True,
-                text=True,
-                timeout=600,
-            )
-            if r.returncode == 0 and r.stdout:
-                return int(r.stdout.split()[0])
-        except (ValueError, subprocess.TimeoutExpired, FileNotFoundError, IndexError, OSError):
-            continue
+        n = _du_sb_subprocess(path, [du_cmd, "-sb", str(path)])
+        if n > 0:
+            return n
+    return 0
+
+
+def _walk_file_bytes_sum(path: pathlib.Path) -> int:
     total = 0
     try:
         for root, _dirs, files in os.walk(path, followlinks=False):
@@ -65,6 +68,86 @@ def directory_size_bytes(path: pathlib.Path) -> int:
     except OSError as e:
         log.debug("directory_size_bytes walk failed for %s: %s", path, e)
     return total
+
+
+def _du_sudo(path: pathlib.Path) -> int:
+    if not getattr(config, "PROVISION_CLEAR_HOST_DATA_SUDO_CHOWN", True):
+        return 0
+    if os.name == "nt":
+        return 0
+    try:
+        is_root = os.geteuid() == 0
+    except AttributeError:
+        is_root = False
+    cmd = ["du", "-sb", str(path)] if is_root else ["sudo", "-n", "du", "-sb", str(path)]
+    return _du_sb_subprocess(path, cmd)
+
+
+def _du_docker(path: pathlib.Path) -> int:
+    if not getattr(config, "PROVISION_CLEAR_HOST_DATA_DOCKER_CHOWN_FALLBACK", True):
+        return 0
+    if os.name == "nt":
+        return 0
+    mount = "/_vdb_sz"
+    try:
+        resolved = path.resolve()
+        r = subprocess.run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{resolved}:{mount}:ro",
+                "alpine:3.20",
+                "du",
+                "-sk",
+                mount,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            kb = int(r.stdout.split()[0])
+            return kb * 1024
+    except (ValueError, subprocess.TimeoutExpired, FileNotFoundError, IndexError, OSError) as e:
+        log.debug("docker du failed for %s: %s", path, e)
+    return 0
+
+
+def _elevated_du(path: pathlib.Path) -> int:
+    n = _du_sudo(path)
+    if n > 0:
+        return n
+    return _du_docker(path)
+
+
+def directory_size_bytes(path: pathlib.Path) -> int:
+    """Recursive size under ``path``. Uses elevated du (sudo/docker) when the bench user cannot read the tree."""
+    if not path.exists():
+        return 0
+
+    try:
+        first_entry = next(path.iterdir(), None)
+    except PermissionError:
+        log.debug("disk usage: cannot list %s as bench user; trying sudo/docker du", path)
+        return _elevated_du(path)
+    except OSError as e:
+        log.debug("disk usage: listdir %s: %s; trying elevated du", path, e)
+        return _elevated_du(path)
+
+    if first_entry is None:
+        return 0
+
+    n = _du_user(path)
+    if n > 0:
+        return n
+    n = _walk_file_bytes_sum(path)
+    if n > 0:
+        return n
+
+    log.debug("disk usage: user du/walk returned 0 for non-empty %s; trying elevated du", path)
+    return _elevated_du(path)
 
 
 def apply_disk_usage_sample(metric, db: DB, *, phase: str) -> None:
