@@ -184,6 +184,9 @@ def run_with_auto_provision(
         dim = runners[0].ca.dataset.data.dim
         resource_profile = get_resource_profile(data_size, dim, instance_config, db=db)
 
+        if getattr(config, "PROVISION_CLEAR_HOST_DATA_AFTER_RUN", False):
+            clear_auto_provision_host_data_dir(db, phase="pre-provision")
+
         try:
             conn = provisioner.provision(
                 resource_profile=resource_profile,
@@ -227,7 +230,7 @@ def run_with_auto_provision(
                     not leave_running
                     and getattr(config, "PROVISION_CLEAR_HOST_DATA_AFTER_RUN", False)
                 ):
-                    clear_auto_provision_host_data_dir(db)
+                    clear_auto_provision_host_data_dir(db, phase="post-run")
             except Exception as e:
                 log.warning(f"Teardown failed for {db}: {e}")
             gap = config.POST_PROVISION_TEARDOWN_DELAY_SEC
