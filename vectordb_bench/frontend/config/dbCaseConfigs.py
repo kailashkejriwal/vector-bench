@@ -855,7 +855,7 @@ CaseConfigParamInput_Granularity_Clickhouse = CaseConfigInput(
     displayLabel="Granularity",
     inputHelp="Size of index granules (rows per sub-index). Larger = fewer granules, faster queries. Default 10M.",
     inputType=InputType.Number,
-    inputConfig={"min": 100_000, "max": 100_000_000, "value": 10_000_000, "step": 100_000},
+    inputConfig={"min": 100, "max": 100_000_000, "value": 10_000_000, "step": 100},
     isDisplayed=lambda config: True,
 )
 
