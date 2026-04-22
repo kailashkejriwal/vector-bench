@@ -156,6 +156,8 @@ class CaseConfigParamType(Enum):
     # ClickHouse HNSW optimization
     quantization = "quantization"
     granularity = "granularity"
+    query_type = "query_type"
+    distance_threshold = "distance_threshold"
     # Qdrant optimization (on_disk exists above)
     hnsw_ef = "hnsw_ef"
     # Weaviate HNSW optimization (dynamic ef when ef=-1)

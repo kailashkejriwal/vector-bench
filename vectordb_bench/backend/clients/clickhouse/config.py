@@ -41,6 +41,8 @@ class ClickhouseIndexConfig(BaseModel, DBCaseConfig):
     vector_data_type: str | None = "Float32"  # Data type of vectors. Can be Float32 or Float64 or BFloat16
     create_index_before_load: bool = True
     create_index_after_load: bool = False
+    query_type: str = "order_by_limit"  # order_by_limit | distance_threshold
+    distance_threshold: float = 0.5
 
     def parse_metric(self) -> str:
         if not self.metric_type:
@@ -88,7 +90,11 @@ class ClickhouseHNSWConfig(ClickhouseIndexConfig):
     def search_param(self) -> dict:
         return {
             "metric_type": self.parse_metric_str(),
-            "params": {"ef": self.ef},
+            "params": {
+                "ef": self.ef,
+                "query_type": self.query_type,
+                "distance_threshold": self.distance_threshold,
+            },
         }
 
     def session_param(self) -> dict:
@@ -117,7 +123,11 @@ class ClickhouseQBitConfig(ClickhouseIndexConfig):
     def search_param(self) -> dict:
         return {
             "metric_type": self.parse_metric_str(),
-            "params": {"precision_bits": self.precision_bits},
+            "params": {
+                "precision_bits": self.precision_bits,
+                "query_type": self.query_type,
+                "distance_threshold": self.distance_threshold,
+            },
         }
 
     def session_param(self) -> dict:
@@ -142,7 +152,10 @@ class ClickhouseFlatConfig(ClickhouseIndexConfig):
     def search_param(self) -> dict:
         return {
             "metric_type": self.parse_metric_str(),
-            "params": {},
+            "params": {
+                "query_type": self.query_type,
+                "distance_threshold": self.distance_threshold,
+            },
         }
 
     def session_param(self) -> dict:
