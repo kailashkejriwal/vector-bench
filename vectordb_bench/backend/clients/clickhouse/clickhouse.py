@@ -282,33 +282,19 @@ class Clickhouse(VectorDB):
         apply_label_filter = getattr(self, "_filter_label_value", None) is not None
         gt = self._filter_gt if apply_num_filter else 0
         label_val = self._filter_label_value if apply_label_filter else ""
+        query_type = self.search_param["params"].get("query_type", "order_by_limit")
+        use_distance_threshold = query_type == "distance_threshold"
+        distance_threshold = self.search_param["params"].get("distance_threshold", 0.5)
         # Pass as list so clickhouse-driver sends Array; tuple can be sent as Tuple and
         # ClickHouse's arrayCosineDistance may require Array for the query vector.
         query_as_list = list(query)
 
-        if apply_label_filter:
-            where_clause = f"WHERE {self._scalar_label_field} = %(label_val)s "
-        elif apply_num_filter:
-            where_clause = f"WHERE {self._primary_field} >= %(gt)s "
-        else:
-            where_clause = ""
-
         # Handle QBit search with precision control
         if self.index_param["index_type"] == IndexType.QBIT.value:
             precision_bits = self.search_param["params"].get("precision_bits", 16)
-            if where_clause:
-                sql = (
-                    f"SELECT {self._primary_field} FROM {db}.{table} "
-                    f"{where_clause}"
-                    f"ORDER BY L2DistanceTransposed({self._vector_field}, cast(%(query)s AS Array(Float32)), {precision_bits}) "
-                    f"LIMIT %(k)s"
-                )
-            else:
-                sql = (
-                    f"SELECT {self._primary_field} FROM {db}.{table} "
-                    f"ORDER BY L2DistanceTransposed({self._vector_field}, cast(%(query)s AS Array(Float32)), {precision_bits}) "
-                    f"LIMIT %(k)s"
-                )
+            distance_expr = (
+                f"L2DistanceTransposed({self._vector_field}, cast(%(query)s AS Array(Float32)), {precision_bits})"
+            )
         else:
             # Handle traditional distance functions
             if self.case_config.metric_type == MetricType.COSINE:
@@ -326,25 +312,31 @@ class Clickhouse(VectorDB):
             else:
                 distance_func = "L2Distance"  # Default fallback
 
-            if where_clause:
-                sql = (
-                    f"SELECT {self._primary_field} FROM {db}.{table} "
-                    f"{where_clause}"
-                    f"ORDER BY {distance_func}({self._vector_field}, cast(%(query)s AS Array(Float32))) "
-                    f"LIMIT %(k)s"
-                )
-            else:
-                sql = (
-                    f"SELECT {self._primary_field} FROM {db}.{table} "
-                    f"ORDER BY {distance_func}({self._vector_field}, cast(%(query)s AS Array(Float32))) "
-                    f"LIMIT %(k)s"
-                )
+            distance_expr = f"{distance_func}({self._vector_field}, cast(%(query)s AS Array(Float32)))"
+
+        where_conditions: list[str] = []
+        if apply_label_filter:
+            where_conditions.append(f"{self._scalar_label_field} = %(label_val)s")
+        elif apply_num_filter:
+            where_conditions.append(f"{self._primary_field} >= %(gt)s")
+        if use_distance_threshold:
+            where_conditions.append(f"{distance_expr} <= %(distance_threshold)s")
+
+        where_clause = f"WHERE {' AND '.join(where_conditions)} " if where_conditions else ""
+        sql = (
+            f"SELECT {self._primary_field} FROM {db}.{table} "
+            f"{where_clause}"
+            f"ORDER BY {distance_expr} "
+            f"LIMIT %(k)s"
+        )
 
         params: dict[str, Any] = {"query": query_as_list, "k": k}
         if apply_num_filter:
             params["gt"] = gt
         if apply_label_filter:
             params["label_val"] = label_val
+        if use_distance_threshold:
+            params["distance_threshold"] = distance_threshold
 
         exec_kwargs: dict[str, Any] = {}
         capped = _clickhouse_thread_cap_settings()

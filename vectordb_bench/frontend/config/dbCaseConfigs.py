@@ -21,6 +21,8 @@ class _FilterConfigParamType(Enum):
 class _OptConfigParamType(Enum):
     quantization = "quantization"
     granularity = "granularity"
+    query_type = "query_type"
+    distance_threshold = "distance_threshold"
     hnsw_ef = "hnsw_ef"
     on_disk = "on_disk"
     dynamic_ef_factor = "dynamicEfFactor"
@@ -857,6 +859,26 @@ CaseConfigParamInput_Granularity_Clickhouse = CaseConfigInput(
     inputType=InputType.Number,
     inputConfig={"min": 100, "max": 100_000_000, "value": 10_000_000, "step": 100},
     isDisplayed=lambda config: True,
+)
+CaseConfigParamInput_QueryType_Clickhouse = CaseConfigInput(
+    label=_opt_param("query_type"),
+    displayLabel="Query type",
+    inputHelp=(
+        "Select ClickHouse vector query shape: "
+        "order_by_limit = ORDER BY distance LIMIT K; "
+        "distance_threshold = add distance <= threshold in WHERE for index-assisted pruning."
+    ),
+    inputType=InputType.Option,
+    inputConfig={"options": ["order_by_limit", "distance_threshold"]},
+    isDisplayed=lambda config: True,
+)
+CaseConfigParamInput_DistanceThreshold_Clickhouse = CaseConfigInput(
+    label=_opt_param("distance_threshold"),
+    displayLabel="Distance threshold",
+    inputHelp="Used only when query_type=distance_threshold. Rows with distance <= threshold are considered before top-k ordering.",
+    inputType=InputType.Float,
+    inputConfig={"min": 0.0, "max": 1000.0, "value": 0.5, "step": 0.01},
+    isDisplayed=lambda config: config.get(_opt_param("query_type"), "order_by_limit") == "distance_threshold",
 )
 
 CaseConfigParamInput_SQType = CaseConfigInput(
@@ -3032,6 +3054,8 @@ ClickhousePerformanceConfig = [
     CaseConfigParamInput_EF_Clickhouse,
     CaseConfigParamInput_Quantization_Clickhouse,
     CaseConfigParamInput_Granularity_Clickhouse,
+    CaseConfigParamInput_QueryType_Clickhouse,
+    CaseConfigParamInput_DistanceThreshold_Clickhouse,
 ]
 
 # Map DB to config
