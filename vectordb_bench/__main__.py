@@ -1,9 +1,12 @@
+import sys
 import logging
 import os
 import pathlib
 import socket
 import subprocess
 import traceback
+
+sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 
 from . import config
 
@@ -42,7 +45,7 @@ def run_streamlit():
         "--server.address",
         "0.0.0.0",
         "--server.port",
-        str(port),
+        "8502",
         "--logger.level",
         "info",
         "--theme.base",
