@@ -31,21 +31,27 @@ def _first_free_port(preferred: int, span: int = 20) -> int:
 
 
 def run_streamlit():
-    import sys
-    venv_dir = pathlib.Path(sys.executable).parent.parent
-    streamlit_path = venv_dir / "bin" / "streamlit"
+    project_root = pathlib.Path(__file__).resolve().parents[1]
+    app_file = pathlib.Path(__file__).parent / "frontend" / "vdbbench.py"
     preferred = int(os.environ.get("VDB_STREAMLIT_PORT", "8509"))
     port = _first_free_port(preferred)
     if port != preferred:
         log.warning("Streamlit port %s in use; using %s (set VDB_STREAMLIT_PORT to force)", preferred, port)
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        f"{project_root}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(project_root)
+    )
     cmd = [
-        str(streamlit_path),
+        sys.executable,
+        "-m",
+        "streamlit",
         "run",
-        f"{pathlib.Path(__file__).parent}/frontend/vdbbench.py",
+        str(app_file),
         "--server.address",
         "0.0.0.0",
         "--server.port",
-        "8502",
+        str(port),
         "--logger.level",
         "info",
         "--theme.base",
@@ -57,7 +63,7 @@ def run_streamlit():
     ]
     log.debug(f"cmd: {cmd}")
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, env=env, cwd=str(project_root))
     except KeyboardInterrupt:
         log.info("exit streamlit...")
     except Exception as e:

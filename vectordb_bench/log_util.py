@@ -1,11 +1,13 @@
 import logging
+import sys
+import tempfile
 from logging import config
 from pathlib import Path
 
 
 def init(log_level: str, log_file: Path):
-    # Create logs directory if it doesn't exist
-    log_file.parent.mkdir(exist_ok=True, parents=True)
+    # Resolve to a writable log file path; fall back to temp dir if needed.
+    log_file = _resolve_writable_log_file(log_file)
 
     log_config = {
         "version": 1,
@@ -31,7 +33,7 @@ def init(log_level: str, log_file: Path):
             "file": {
                 "class": "logging.handlers.RotatingFileHandler",
                 "formatter": "default",
-                "filename": log_file,
+                "filename": str(log_file),
                 "maxBytes": 10485760,  # 10MB
                 "backupCount": 5,
                 "encoding": "utf8",
@@ -53,6 +55,21 @@ def init(log_level: str, log_file: Path):
     }
 
     config.dictConfig(log_config)
+
+
+def _resolve_writable_log_file(log_file: Path) -> Path:
+    try:
+        log_file.parent.mkdir(exist_ok=True, parents=True)
+        return log_file
+    except PermissionError:
+        fallback_dir = Path(tempfile.gettempdir()) / "vectordb_bench" / "logs"
+        fallback_file = fallback_dir / log_file.name
+        fallback_dir.mkdir(exist_ok=True, parents=True)
+        print(
+            f"Warning: cannot write log directory '{log_file.parent}', using fallback '{fallback_file}'.",
+            file=sys.stderr,
+        )
+        return fallback_file
 
 
 class colors:
