@@ -220,14 +220,30 @@ class Clickhouse(VectorDB):
                 f"({cols}, "
                 f"CONSTRAINT same_length CHECK length(embedding) = {dim}) "
                 f"ENGINE = MergeTree() "
-                f"ORDER BY {self._primary_field}"
+                f"ORDER BY {self._primary_field} "
+                f"SETTINGS index_granularity = 128"
+            )
+            log.info(
+                "Created Clickhouse table %s.%s with index_granularity=128",
+                self.db_config["database"],
+                self.table_name,
             )
         except Exception as e:
             log.warning("Failed to create Clickhouse table %s: %s", self.table_name, e)
             raise e from None
 
     def optimize(self, data_size: int | None = None):
-        pass
+        assert self.conn is not None, "Connection is not initialized"
+        db = self.db_config["database"]
+        table = self.table_name
+        try:
+            # Benchmarks are more representative after parts are merged.
+            log.info("Running OPTIMIZE TABLE FINAL on %s.%s", db, table)
+            self.conn.execute(f"OPTIMIZE TABLE {db}.{table} FINAL")
+            log.info("Completed OPTIMIZE TABLE FINAL on %s.%s", db, table)
+        except Exception as e:
+            log.warning("Failed to optimize Clickhouse table %s.%s: %s", db, table, e)
+            raise e from None
 
     def _post_insert(self):
         pass
