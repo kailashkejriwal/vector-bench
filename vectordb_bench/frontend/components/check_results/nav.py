@@ -1,4 +1,17 @@
-from streamlit_extras.switch_page_button import switch_page
+def _switch_page(st, target: str):
+    # Prefer native Streamlit navigation to avoid a hard dependency on streamlit_extras.
+    if hasattr(st, "switch_page"):
+        st.switch_page(target)
+        return
+    try:
+        from streamlit_extras.switch_page_button import switch_page
+    except ModuleNotFoundError:
+        st.warning(
+            "Page navigation helper is unavailable. Install streamlit-extras or upgrade Streamlit.",
+            icon="⚠️",
+        )
+        return
+    switch_page(target)
 
 
 def NavToRunTest(st):
@@ -6,20 +19,20 @@ def NavToRunTest(st):
     st.write("You can set the configs and run your own test.")
     navClick = st.button("Run Your Test &nbsp;&nbsp;>")
     if navClick:
-        switch_page("run test")
+        _switch_page(st, "pages/run_test.py")
 
 
 def NavToQuriesPerDollar(st):
     st.subheader("Compare qps with price.")
     navClick = st.button("QP$ (Queries per Dollar) &nbsp;&nbsp;>")
     if navClick:
-        switch_page("results")
+        _switch_page(st, "pages/results.py")
 
 
 def NavToResults(st, key="nav-to-results"):
     navClick = st.button("< &nbsp;&nbsp;Back to Results", key=key)
     if navClick:
-        switch_page("results")
+        _switch_page(st, "pages/results.py")
 
 
 def NavToPages(st):
