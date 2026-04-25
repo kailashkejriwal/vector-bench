@@ -161,6 +161,14 @@ def _raw_dir_for_db(db: DB) -> str:
     return (mapping.get(db) or "").strip()
 
 
+def _make_container_writable(path: pathlib.Path, *, label: str) -> None:
+    """Ensure bind-mount data dir is writable by non-root DB users in containers."""
+    try:
+        path.chmod(0o777)
+    except OSError as e:
+        log.warning("%s cleanup: could not set writable permissions on %s: %s", label, path, e)
+
+
 def clear_auto_provision_host_data_dir(db: DB, *, phase: str = "post-run") -> None:
     """Delete the configured host data dir for this DB (if it exists), then recreate an empty directory.
 
@@ -189,6 +197,7 @@ def clear_auto_provision_host_data_dir(db: DB, *, phase: str = "post-run") -> No
         if phase == "pre-provision":
             try:
                 resolved.mkdir(parents=True, exist_ok=True)
+                _make_container_writable(resolved, label=label)
                 log.info("Pre-provision: created empty data dir %s", resolved)
             except OSError as e:
                 log.warning("Pre-provision: could not create data dir %s: %s", resolved, e)
@@ -200,6 +209,7 @@ def clear_auto_provision_host_data_dir(db: DB, *, phase: str = "post-run") -> No
     try:
         shutil.rmtree(resolved)
         resolved.mkdir(parents=True, exist_ok=True)
+        _make_container_writable(resolved, label=label)
         log.info("%s cleanup: recreated empty dir %s", label, resolved)
     except OSError as e:
         if _permission_denied(e):
@@ -207,6 +217,7 @@ def clear_auto_provision_host_data_dir(db: DB, *, phase: str = "post-run") -> No
                 try:
                     shutil.rmtree(resolved)
                     resolved.mkdir(parents=True, exist_ok=True)
+                    _make_container_writable(resolved, label=label)
                     log.info(
                         "%s cleanup: recreated empty dir %s (after ownership fix)",
                         label,
