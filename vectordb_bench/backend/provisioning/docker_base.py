@@ -117,7 +117,27 @@ def _inspect_port(container_id: str, container_port: int) -> str:
     port_str = (out.stdout or "").strip()
     if port_str and port_str.isdigit():
         return port_str
-    return str(container_port)
+    network_mode = (
+        _run(
+            [
+                "docker",
+                "inspect",
+                "--format",
+                "{{.HostConfig.NetworkMode}}",
+                container_id,
+            ],
+            timeout=10,
+        ).stdout
+        or ""
+    ).strip()
+    if network_mode == "host":
+        return str(container_port)
+    raise RuntimeError(
+        "Container port mapping not found for "
+        f"{container_port}/tcp (network_mode={network_mode or 'unknown'}). "
+        "Ensure Docker bridge networking and -p publishing are available, "
+        "or run container with network_mode=host."
+    )
 
 
 def _container_still_exists(container_id: str) -> bool:
