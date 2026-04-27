@@ -13,6 +13,9 @@ class ClickhouseConfigDict(TypedDict):
     port: int
     database: str
     secure: bool
+    enable_flamegraph: bool
+    flamegraph_real_time_period_ns: int
+    flamegraph_cpu_time_period_ns: int
 
 
 class ClickhouseConfig(DBConfig):
@@ -22,6 +25,9 @@ class ClickhouseConfig(DBConfig):
     port: int = 9000  # native TCP (clickhouse-driver); HTTP is 8123
     db_name: str = "default"
     secure: bool = False
+    enable_flamegraph: bool = False
+    flamegraph_real_time_period_ns: int = 10_000_000
+    flamegraph_cpu_time_period_ns: int = 10_000_000
 
     def to_dict(self) -> ClickhouseConfigDict:
         pwd_str = self.password.get_secret_value()
@@ -32,6 +38,9 @@ class ClickhouseConfig(DBConfig):
             "user": self.user,
             "password": pwd_str,
             "secure": self.secure,
+            "enable_flamegraph": self.enable_flamegraph,
+            "flamegraph_real_time_period_ns": self.flamegraph_real_time_period_ns,
+            "flamegraph_cpu_time_period_ns": self.flamegraph_cpu_time_period_ns,
         }
 
 

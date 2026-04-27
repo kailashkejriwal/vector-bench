@@ -223,11 +223,18 @@ DB_CONFIG_TOOLTIPS: dict[str, str] = {
     "note": "Optional note for this run. Used in results only.",
     "cpu": "CPU limit for the instance (e.g. 4). Performance impact: More vCPUs = faster build and higher QPS; specify when overriding resources. Prefer GB for memory.",
     "memory": "Memory limit for the instance in GB (e.g. 8Gi or 16GB). Performance impact: More memory (GB) allows larger indexes and better cache; insufficient memory causes OOM. Vector + index storage scale with data size.",
+    "enable_flamegraph": "ClickHouse only: enable query profiler + introspection settings for flamegraph collection. Performance impact: Adds overhead; enable for diagnostics, disable for baseline benchmarks.",
+    "flamegraph_real_time_period_ns": "ClickHouse only: wall-clock sampling period in nanoseconds for query profiler. Lower values increase sample detail and overhead.",
+    "flamegraph_cpu_time_period_ns": "ClickHouse only: CPU-time sampling period in nanoseconds for query profiler. Lower values increase sample detail and overhead.",
 }
 
 # DB config keys grouped for section headers (order preserved)
 DB_CONFIG_GROUP_ORDER: list[tuple[str, list[str]]] = [
     ("Connection", ["host", "port", "uri", "url", "user", "password", "api_key", "token"]),
+    (
+        "Profiling",
+        ["enable_flamegraph", "flamegraph_real_time_period_ns", "flamegraph_cpu_time_period_ns"],
+    ),
     ("Result labeling", ["db_label", "version", "note"]),
     ("Instance resources (GB)", ["cpu", "memory"]),
 ]

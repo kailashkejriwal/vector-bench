@@ -40,6 +40,15 @@ def _merge_provisioned_db_config(db: DB, provisioned: object, previous: object) 
         prev_table = getattr(previous, "table_name", None)
         if prev_table:
             updates["table_name"] = prev_table
+    if db == DB.Clickhouse:
+        # Preserve ClickHouse profiling controls configured from UI when auto-provision rewrites host/port/user/password.
+        for key in (
+            "enable_flamegraph",
+            "flamegraph_real_time_period_ns",
+            "flamegraph_cpu_time_period_ns",
+        ):
+            if hasattr(previous, key):
+                updates[key] = getattr(previous, key)
     if not updates:
         return provisioned
     return provisioned.copy(update=updates)
@@ -191,7 +200,12 @@ def run_with_auto_provision(
             conn = provisioner.provision(
                 resource_profile=resource_profile,
                 instance_config=instance_config,
-                context={"db": db, "data_size": data_size, "dim": dim},
+                context={
+                    "db": db,
+                    "data_size": data_size,
+                    "dim": dim,
+                    "db_config": runners[0].config.db_config,
+                },
             )
             new_db_config = connection_info_to_db_config(db, conn)
             new_db_config = _merge_provisioned_db_config(db, new_db_config, runners[0].config.db_config)

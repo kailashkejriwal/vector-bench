@@ -37,6 +37,7 @@ class BenchMarkRunner:
         self.running_task: TaskRunner | None = None
         self.latest_error: str | None = None
         self.drop_old: bool = True
+        self._executor: concurrent.futures.Executor | None = None
         # set default data source by ENV
         if config.DATASET_SOURCE.upper() == "ALIYUNOSS":
             self.dataset_source: DatasetSource = DatasetSource.AliyunOSS
@@ -129,6 +130,7 @@ class BenchMarkRunner:
                 global_result_future = None
                 self.running_task = None
                 self.receive_conn = None
+                self._shutdown_executor()
             elif sig == SIGNAL.WIP:
                 self.running_task.set_finished(received)
             else:
@@ -174,6 +176,7 @@ class BenchMarkRunner:
         finally:
             global_result_future = None
             self.running_task = None
+            self._shutdown_executor()
 
     def _async_task_v2(self, running_task: TaskRunner, send_conn: Connection) -> None:
         try:
@@ -279,6 +282,7 @@ class BenchMarkRunner:
                 log.warning("_clear_running_task cleanup failed (%s), continuing", e)
             finally:
                 self.running_task = None
+        self._shutdown_executor()
 
         if self.receive_conn:
             try:
@@ -287,14 +291,24 @@ class BenchMarkRunner:
                 pass
             self.receive_conn = None
 
+    def _shutdown_executor(self):
+        if self._executor is not None:
+            try:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+            except Exception as e:
+                log.warning("executor shutdown failed (%s)", e)
+            finally:
+                self._executor = None
+
     def _run_async(self, conn: Connection) -> bool:
         log.info(
             f"task submitted: id={self.running_task.run_id}, {self.running_task.task_label}, "
             f"case number: {len(self.running_task.case_runners)}"
         )
         global global_result_future
+        self._shutdown_executor()
         try:
-            executor = concurrent.futures.ProcessPoolExecutor(
+            self._executor = concurrent.futures.ProcessPoolExecutor(
                 max_workers=1,
                 mp_context=mp.get_context("spawn"),
             )
@@ -304,8 +318,8 @@ class BenchMarkRunner:
                 "This can happen on restricted VMs or containers.",
                 e,
             )
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        global_result_future = executor.submit(self._async_task_v2, self.running_task, conn)
+            self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        global_result_future = self._executor.submit(self._async_task_v2, self.running_task, conn)
 
         return True
 

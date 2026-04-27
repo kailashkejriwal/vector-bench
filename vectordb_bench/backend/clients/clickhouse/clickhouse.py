@@ -17,13 +17,35 @@ from .config import ClickhouseConfigDict, ClickhouseIndexConfig
 log = logging.getLogger(__name__)
 
 
-def _clickhouse_thread_cap_settings(base: dict | None = None) -> dict:
-    """Cap max_threads / merge_tree_max_threads to avoid vector-similarity 'Too many threads' under load."""
+def _clickhouse_thread_cap_settings(
+    base: dict | None = None,
+    db_config: ClickhouseConfigDict | None = None,
+) -> dict:
+    """Build ClickHouse session settings used by the native client and queries."""
     out = dict(base or {})
     mt = int(getattr(config, "CLICKHOUSE_QUERY_MAX_THREADS", 0) or 0)
     if mt > 0:
         out["max_threads"] = mt
         out["merge_tree_max_threads"] = mt
+    enable_flamegraph = bool(
+        (db_config or {}).get("enable_flamegraph", getattr(config, "CLICKHOUSE_ENABLE_FLAMEGRAPH", False))
+    )
+    if enable_flamegraph:
+        real_time_period_ns = int(
+            (db_config or {}).get(
+                "flamegraph_real_time_period_ns",
+                getattr(config, "CLICKHOUSE_FLAMEGRAPH_REAL_TIME_PERIOD_NS", 10_000_000),
+            )
+        )
+        cpu_time_period_ns = int(
+            (db_config or {}).get(
+                "flamegraph_cpu_time_period_ns",
+                getattr(config, "CLICKHOUSE_FLAMEGRAPH_CPU_TIME_PERIOD_NS", 10_000_000),
+            )
+        )
+        out["allow_introspection_functions"] = 1
+        out["query_profiler_real_time_period_ns"] = real_time_period_ns
+        out["query_profiler_cpu_time_period_ns"] = cpu_time_period_ns
     return out
 
 
@@ -106,7 +128,13 @@ class Clickhouse(VectorDB):
             self.conn = None
 
     def _create_connection(self) -> NativeClient:
-        settings = _clickhouse_thread_cap_settings(self.session_param)
+        settings = _clickhouse_thread_cap_settings(self.session_param, self.db_config)
+        if settings.get("allow_introspection_functions") == 1:
+            log.info(
+                "ClickHouse flamegraph profiler enabled (real_time_ns=%s, cpu_time_ns=%s)",
+                settings.get("query_profiler_real_time_period_ns"),
+                settings.get("query_profiler_cpu_time_period_ns"),
+            )
         return NativeClient(
             host=self.db_config["host"],
             port=self.db_config["port"],
@@ -355,8 +383,8 @@ class Clickhouse(VectorDB):
             params["distance_threshold"] = distance_threshold
 
         exec_kwargs: dict[str, Any] = {}
-        capped = _clickhouse_thread_cap_settings()
+        capped = _clickhouse_thread_cap_settings(db_config=self.db_config)
         if capped:
-            exec_kwargs["settings"] = {k: capped[k] for k in ("max_threads", "merge_tree_max_threads") if k in capped}
+            exec_kwargs["settings"] = capped
         result = self.conn.execute(sql, params, **exec_kwargs)
         return [int(row[0]) for row in result]

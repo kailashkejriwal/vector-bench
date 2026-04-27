@@ -63,6 +63,22 @@ class config:
     CLICKHOUSE_DATA_DIR = env.str("CLICKHOUSE_DATA_DIR", "")
     # Milvus (Docker standalone) data on NVMe: mounts to /var/lib/milvus in container
     MILVUS_DATA_DIR = env.str("MILVUS_DATA_DIR", "")
+    # Enable ClickHouse query profiler settings for flamegraph collection (system.trace_log/introspection).
+    CLICKHOUSE_ENABLE_FLAMEGRAPH = env.bool("CLICKHOUSE_ENABLE_FLAMEGRAPH", False)
+    # Sampling periods for ClickHouse query profiler (nanoseconds). Lower values increase overhead.
+    CLICKHOUSE_FLAMEGRAPH_REAL_TIME_PERIOD_NS = env.int(
+        "CLICKHOUSE_FLAMEGRAPH_REAL_TIME_PERIOD_NS", 10_000_000
+    )
+    CLICKHOUSE_FLAMEGRAPH_CPU_TIME_PERIOD_NS = env.int(
+        "CLICKHOUSE_FLAMEGRAPH_CPU_TIME_PERIOD_NS", 10_000_000
+    )
+    # Auto-provisioned ClickHouse: mount config.d snippet to enable system.trace_log for diagnostics/chdg.
+    CLICKHOUSE_ENABLE_TRACE_LOG = env.bool("CLICKHOUSE_ENABLE_TRACE_LOG", False)
+    CLICKHOUSE_TRACE_LOG_FLUSH_INTERVAL_MS = env.int("CLICKHOUSE_TRACE_LOG_FLUSH_INTERVAL_MS", 7500)
+    # Auto-provisioned ClickHouse (Docker): optional permissions for profiler/perf-based diagnostics in containers.
+    CLICKHOUSE_DOCKER_ENABLE_PROFILE_PERMISSIONS = env.bool(
+        "CLICKHOUSE_DOCKER_ENABLE_PROFILE_PERMISSIONS", False
+    )
     # After TCP is open, querynode may not be registered yet (LoadCollection needs currentNodeNum>=1). 0 disables.
     MILVUS_EXTRA_READINESS_WAIT_SEC = env.int("MILVUS_EXTRA_READINESS_WAIT_SEC", 10)
     # Retry col.load() / load(refresh=True) when Milvus reports resource group / query node not ready.
