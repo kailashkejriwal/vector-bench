@@ -1,5 +1,6 @@
 from pydantic import ValidationError
 import streamlit as st
+import streamlit as st_runtime
 
 from vectordb_bench.backend.clients import DB
 from vectordb_bench.backend.provisioning import supports_auto_provision
@@ -173,7 +174,7 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
         # Hide flamegraph sampling fields unless the toggle is enabled in UI/session state.
         if flamegraph_toggle_key in properties:
             flamegraph_state_key = f"{key_prefix}{flamegraph_toggle_key}"
-            flamegraph_enabled = st.session_state.get(
+            flamegraph_enabled = st_runtime.session_state.get(
                 flamegraph_state_key,
                 properties.get(flamegraph_toggle_key, {}).get("default", False),
             )
