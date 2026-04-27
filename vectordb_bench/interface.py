@@ -32,6 +32,90 @@ log = logging.getLogger(__name__)
 global_result_future: concurrent.futures.Future | None = None
 
 
+def _async_task_entry(running_task: TaskRunner, drop_old_flag: bool, send_conn: Connection) -> None:
+    """Process-pool entrypoint. Keep as module-level function to avoid pickling `self`."""
+    try:
+        if not running_task:
+            return
+
+        use_auto_provision = any(
+            getattr(r.config, "auto_start", False) for r in running_task.case_runners
+        )
+
+        if use_auto_provision:
+            c_results = run_with_auto_provision(
+                running_task.case_runners,
+                drop_old=drop_old_flag,
+                send_conn=send_conn,
+            )
+        else:
+            c_results = []
+            latest_runner, cached_load_duration = None, None
+            for idx, runner in enumerate(running_task.case_runners):
+                case_res = CaseResult(
+                    metrics=Metric(),
+                    task_config=runner.config,
+                )
+
+                drop_old = TaskStage.DROP_OLD in runner.config.stages
+                if (latest_runner and runner == latest_runner) or not drop_old_flag:
+                    drop_old = False
+                num_cases = running_task.num_cases()
+                try:
+                    log.info(f"[{idx+1}/{num_cases}] start case: {runner.display()}, drop_old={drop_old}")
+                    case_res.metrics = runner.run(drop_old)
+                    log.info(
+                        f"[{idx+1}/{num_cases}] finish case: {runner.display()}, "
+                        f"result={case_res.metrics}, label={case_res.label}"
+                    )
+
+                    # cache the latest succeeded runner
+                    latest_runner = runner
+
+                    # cache the latest drop_old=True load_duration of the latest succeeded runner
+                    cached_load_duration = case_res.metrics.load_duration if drop_old else cached_load_duration
+
+                    # use the cached load duration if this case didn't drop the existing collection
+                    if not drop_old:
+                        case_res.metrics.load_duration = cached_load_duration if cached_load_duration else 0.0
+                except (LoadTimeoutError, PerformanceTimeoutError) as e:
+                    log.warning(f"[{idx+1}/{num_cases}] case {runner.display()} failed to run, reason={e}")
+                    case_res.label = ResultLabel.OUTOFRANGE
+                    continue
+
+                except Exception as e:
+                    log.warning(f"[{idx+1}/{num_cases}] case {runner.display()} failed to run, reason={e}")
+                    traceback.print_exc()
+                    case_res.label = ResultLabel.FAILED
+                    continue
+
+                finally:
+                    c_results.append(case_res)
+                    send_conn.send((SIGNAL.WIP, idx))
+
+        test_result = TestResult(
+            run_id=running_task.run_id,
+            task_label=running_task.task_label,
+            results=c_results,
+        )
+        test_result.display()
+        test_result.flush()
+
+        send_conn.send((SIGNAL.SUCCESS, None))
+        send_conn.close()
+        log.info(f"Success to finish task: label={running_task.task_label}, run_id={running_task.run_id}")
+
+    except Exception as e:
+        err_msg = (
+            f"An error occurs when running task={running_task.task_label}, run_id={running_task.run_id}, err={e}"
+        )
+        traceback.print_exc()
+        log.warning(err_msg)
+        send_conn.send((SIGNAL.ERROR, err_msg))
+        send_conn.close()
+        return
+
+
 class BenchMarkRunner:
     def __init__(self):
         self.running_task: TaskRunner | None = None
@@ -200,88 +284,6 @@ class BenchMarkRunner:
             self.running_task = None
             self._shutdown_executor()
 
-    def _async_task_v2(self, running_task: TaskRunner, send_conn: Connection) -> None:
-        try:
-            if not running_task:
-                return
-
-            use_auto_provision = any(
-                getattr(r.config, "auto_start", False) for r in running_task.case_runners
-            )
-
-            if use_auto_provision:
-                c_results = run_with_auto_provision(
-                    running_task.case_runners,
-                    drop_old=self.drop_old,
-                    send_conn=send_conn,
-                )
-            else:
-                c_results = []
-                latest_runner, cached_load_duration = None, None
-                for idx, runner in enumerate(running_task.case_runners):
-                    case_res = CaseResult(
-                        metrics=Metric(),
-                        task_config=runner.config,
-                    )
-
-                    drop_old = TaskStage.DROP_OLD in runner.config.stages
-                    if (latest_runner and runner == latest_runner) or not self.drop_old:
-                        drop_old = False
-                    num_cases = running_task.num_cases()
-                    try:
-                        log.info(f"[{idx+1}/{num_cases}] start case: {runner.display()}, drop_old={drop_old}")
-                        case_res.metrics = runner.run(drop_old)
-                        log.info(
-                            f"[{idx+1}/{num_cases}] finish case: {runner.display()}, "
-                            f"result={case_res.metrics}, label={case_res.label}"
-                        )
-
-                        # cache the latest succeeded runner
-                        latest_runner = runner
-
-                        # cache the latest drop_old=True load_duration of the latest succeeded runner
-                        cached_load_duration = case_res.metrics.load_duration if drop_old else cached_load_duration
-
-                        # use the cached load duration if this case didn't drop the existing collection
-                        if not drop_old:
-                            case_res.metrics.load_duration = cached_load_duration if cached_load_duration else 0.0
-                    except (LoadTimeoutError, PerformanceTimeoutError) as e:
-                        log.warning(f"[{idx+1}/{num_cases}] case {runner.display()} failed to run, reason={e}")
-                        case_res.label = ResultLabel.OUTOFRANGE
-                        continue
-
-                    except Exception as e:
-                        log.warning(f"[{idx+1}/{num_cases}] case {runner.display()} failed to run, reason={e}")
-                        traceback.print_exc()
-                        case_res.label = ResultLabel.FAILED
-                        continue
-
-                    finally:
-                        c_results.append(case_res)
-                        send_conn.send((SIGNAL.WIP, idx))
-
-            test_result = TestResult(
-                run_id=running_task.run_id,
-                task_label=running_task.task_label,
-                results=c_results,
-            )
-            test_result.display()
-            test_result.flush()
-
-            send_conn.send((SIGNAL.SUCCESS, None))
-            send_conn.close()
-            log.info(f"Success to finish task: label={running_task.task_label}, run_id={running_task.run_id}")
-
-        except Exception as e:
-            err_msg = (
-                f"An error occurs when running task={running_task.task_label}, run_id={running_task.run_id}, err={e}"
-            )
-            traceback.print_exc()
-            log.warning(err_msg)
-            send_conn.send((SIGNAL.ERROR, err_msg))
-            send_conn.close()
-            return
-
     def _clear_running_task(self):
         global global_result_future
         global_result_future = None
@@ -344,7 +346,7 @@ class BenchMarkRunner:
         try:
             # Submit before storing executor on self; otherwise self can become non-picklable
             # for ProcessPoolExecutor's spawned worker payload on some Python/platform combinations.
-            global_result_future = executor.submit(self._async_task_v2, self.running_task, conn)
+            global_result_future = executor.submit(_async_task_entry, self.running_task, self.drop_old, conn)
         except Exception:
             executor.shutdown(wait=False, cancel_futures=True)
             raise
