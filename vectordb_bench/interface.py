@@ -308,7 +308,7 @@ class BenchMarkRunner:
         global global_result_future
         self._shutdown_executor()
         try:
-            self._executor = concurrent.futures.ProcessPoolExecutor(
+            executor: concurrent.futures.Executor = concurrent.futures.ProcessPoolExecutor(
                 max_workers=1,
                 mp_context=mp.get_context("spawn"),
             )
@@ -318,8 +318,15 @@ class BenchMarkRunner:
                 "This can happen on restricted VMs or containers.",
                 e,
             )
-            self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        global_result_future = self._executor.submit(self._async_task_v2, self.running_task, conn)
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            # Submit before storing executor on self; otherwise self can become non-picklable
+            # for ProcessPoolExecutor's spawned worker payload on some Python/platform combinations.
+            global_result_future = executor.submit(self._async_task_v2, self.running_task, conn)
+        except Exception:
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
+        self._executor = executor
 
         return True
 

@@ -147,6 +147,11 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
     properties = dict(schema.get("properties", {}))
     required_fields = set(schema.get("required", []))
     dbConfig = {}
+    flamegraph_toggle_key = "enable_flamegraph"
+    flamegraph_dependent_keys = {
+        "flamegraph_real_time_period_ns",
+        "flamegraph_cpu_time_period_ns",
+    }
 
     # Collect connection/config keys (exclude common short/long)
     config_keys = [
@@ -165,6 +170,19 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
         if group_name not in grouped:
             continue
         keys_in_group = grouped[group_name]
+        # Hide flamegraph sampling fields unless the toggle is enabled in UI/session state.
+        if flamegraph_toggle_key in properties:
+            flamegraph_state_key = f"{key_prefix}{flamegraph_toggle_key}"
+            flamegraph_enabled = st.session_state.get(
+                flamegraph_state_key,
+                properties.get(flamegraph_toggle_key, {}).get("default", False),
+            )
+            if not flamegraph_enabled:
+                keys_in_group = [
+                    k for k in keys_in_group if k not in flamegraph_dependent_keys
+                ]
+        if not keys_in_group:
+            continue
         st.markdown(group_name)
         columns = st.columns(DB_CONFIG_SETTING_COLUMNS)
         for idx, key in enumerate(keys_in_group):
@@ -179,6 +197,14 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     key=f"{key_prefix}{key}",
                     disabled=True,
                     help="Filled automatically when container starts.",
+                )
+            elif key == flamegraph_toggle_key:
+                default_value = bool(prop.get("default", False))
+                dbConfig[key] = column.checkbox(
+                    key,
+                    value=default_value,
+                    key=f"{key_prefix}{key}",
+                    help=tooltip or None,
                 )
             else:
                 input_value = column.text_input(
