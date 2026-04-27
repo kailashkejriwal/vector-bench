@@ -141,9 +141,31 @@ class BenchMarkRunner:
         try:
             if self.running_task:
                 self._try_get_signal()
+                self._check_async_future_state()
         except Exception as e:
             log.warning("has_running/_try_get_signal failed (%s)", e)
         return self.running_task is not None
+
+    def _check_async_future_state(self):
+        global global_result_future
+        if not self.running_task or global_result_future is None:
+            return
+        if not global_result_future.done():
+            return
+        try:
+            # Surface worker-side errors that happened before any pipe signal.
+            global_result_future.result()
+        except Exception as e:
+            msg = f"Background task failed before signaling parent: {e}"
+            self.latest_error = msg
+            log.warning(msg, exc_info=True)
+            self._clear_running_task()
+            return
+        # Worker exited without ERROR/SUCCESS signal: avoid indefinite UI hang.
+        if self.running_task is not None:
+            self.latest_error = "Background task finished without completion signal."
+            log.warning(self.latest_error)
+            self._clear_running_task()
 
     def stop_running(self):
         """force stop if ther're running benchmarks"""
