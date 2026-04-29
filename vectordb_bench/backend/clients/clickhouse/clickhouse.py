@@ -30,6 +30,9 @@ def _clickhouse_thread_cap_settings(
     enable_flamegraph = bool(
         (db_config or {}).get("enable_flamegraph", getattr(config, "CLICKHOUSE_ENABLE_FLAMEGRAPH", False))
     )
+    fs_read_method = str((db_config or {}).get("local_filesystem_read_method", "") or "").strip()
+    if fs_read_method:
+        out["local_filesystem_read_method"] = fs_read_method
     if enable_flamegraph:
         real_time_period_ns = int(
             (db_config or {}).get(

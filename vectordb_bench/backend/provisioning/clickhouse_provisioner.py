@@ -97,25 +97,37 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
     def _vector_cache_mount_args(self) -> list[str]:
         db_cfg = (self._pending_context or {}).get("db_config")
         requested = int(getattr(db_cfg, "vector_similarity_index_cache_size", 5 * 1024**3) or 0)
+        mark_cache_requested = int(getattr(db_cfg, "mark_cache_size", 5 * 1024**3) or 0)
         default_value = 5 * 1024**3
-        # ClickHouse docs default is 5 GiB. Only mount custom server config when user changed it.
-        if requested <= 0 or requested == default_value:
+        # ClickHouse docs default is 5 GiB. Only mount custom server config when user changed defaults.
+        if (
+            (requested <= 0 or requested == default_value)
+            and (mark_cache_requested <= 0 or mark_cache_requested == default_value)
+        ):
             return []
 
         mount_root = pathlib.Path(tempfile.gettempdir()) / "vectordb_bench_clickhouse_config"
         mount_dir = mount_root / uuid.uuid4().hex
         mount_dir.mkdir(parents=True, exist_ok=True)
         vector_cache_xml = mount_dir / "vectordb_bench_vector_cache.xml"
+        xml_lines = ["<clickhouse>"]
+        if requested > 0:
+            xml_lines.append(
+                f"  <vector_similarity_index_cache_size>{requested}</vector_similarity_index_cache_size>"
+            )
+        if mark_cache_requested > 0:
+            xml_lines.append(f"  <mark_cache_size>{mark_cache_requested}</mark_cache_size>")
+        xml_lines.append("</clickhouse>")
         vector_cache_xml.write_text(
-            (
-                "<clickhouse>\n"
-                f"  <vector_similarity_index_cache_size>{requested}</vector_similarity_index_cache_size>\n"
-                "</clickhouse>\n"
-            ),
+            "\n".join(xml_lines) + "\n",
             encoding="utf-8",
         )
         self._vector_cache_mount_dir = mount_dir
-        log.info("ClickHouse: set vector_similarity_index_cache_size=%s bytes", requested)
+        log.info(
+            "ClickHouse: set vector_similarity_index_cache_size=%s bytes, mark_cache_size=%s bytes",
+            requested,
+            mark_cache_requested,
+        )
         return [
             "-v",
             f"{vector_cache_xml}:/etc/clickhouse-server/config.d/vectordb_bench_vector_cache.xml:ro",

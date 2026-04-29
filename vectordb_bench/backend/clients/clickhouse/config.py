@@ -17,6 +17,8 @@ class ClickhouseConfigDict(TypedDict):
     flamegraph_real_time_period_ns: int
     flamegraph_cpu_time_period_ns: int
     vector_similarity_index_cache_size: int
+    mark_cache_size: int
+    local_filesystem_read_method: str
 
 
 class ClickhouseConfig(DBConfig):
@@ -31,6 +33,10 @@ class ClickhouseConfig(DBConfig):
     flamegraph_cpu_time_period_ns: int = 10_000_000
     # Server-level setting (bytes). Docs default is 5 GiB.
     vector_similarity_index_cache_size: int = 5 * 1024 * 1024 * 1024
+    # Server-level mark cache size (bytes). Default is 5 GiB.
+    mark_cache_size: int = 5 * 1024 * 1024 * 1024
+    # Session-level filesystem read method.
+    local_filesystem_read_method: str = "pread"
 
     def to_dict(self) -> ClickhouseConfigDict:
         pwd_str = self.password.get_secret_value()
@@ -45,6 +51,8 @@ class ClickhouseConfig(DBConfig):
             "flamegraph_real_time_period_ns": self.flamegraph_real_time_period_ns,
             "flamegraph_cpu_time_period_ns": self.flamegraph_cpu_time_period_ns,
             "vector_similarity_index_cache_size": self.vector_similarity_index_cache_size,
+            "mark_cache_size": self.mark_cache_size,
+            "local_filesystem_read_method": self.local_filesystem_read_method,
         }
 
 

@@ -13,7 +13,9 @@ from vectordb_bench.frontend.config.parameter_tooltips import (
 )
 from vectordb_bench.frontend.utils import inputIsPassword
 
-_CACHE_SIZE_KEY = "vector_similarity_index_cache_size"
+_CACHE_SIZE_KEYS = {"vector_similarity_index_cache_size", "mark_cache_size"}
+_READ_METHOD_KEY = "local_filesystem_read_method"
+_READ_METHOD_OPTIONS = ["pread", "read", "mmap", "io_uring"]
 _SIZE_UNITS: dict[str, int] = {
     "MB": 1024**2,
     "GB": 1024**3,
@@ -223,7 +225,7 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     key=f"{key_prefix}{key}",
                     help=tooltip or None,
                 )
-            elif key == _CACHE_SIZE_KEY:
+            elif key in _CACHE_SIZE_KEYS:
                 default_bytes = int(prop.get("default", 5 * 1024**3) or 5 * 1024**3)
                 default_value, default_unit = _bytes_to_value_unit(default_bytes)
                 size_col, unit_col = column.columns(2)
@@ -244,6 +246,17 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     key=f"{key_prefix}{key}-unit",
                 )
                 dbConfig[key] = size_value * _SIZE_UNITS[unit_value]
+            elif key == _READ_METHOD_KEY:
+                default_method = str(prop.get("default", "pread") or "pread")
+                if default_method not in _READ_METHOD_OPTIONS:
+                    default_method = "pread"
+                dbConfig[key] = column.selectbox(
+                    key,
+                    options=_READ_METHOD_OPTIONS,
+                    index=_READ_METHOD_OPTIONS.index(default_method),
+                    key=f"{key_prefix}{key}",
+                    help=tooltip or None,
+                )
             else:
                 input_value = column.text_input(
                     key,
