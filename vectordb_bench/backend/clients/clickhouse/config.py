@@ -16,6 +16,7 @@ class ClickhouseConfigDict(TypedDict):
     enable_flamegraph: bool
     flamegraph_real_time_period_ns: int
     flamegraph_cpu_time_period_ns: int
+    vector_similarity_index_cache_size: int
 
 
 class ClickhouseConfig(DBConfig):
@@ -28,6 +29,8 @@ class ClickhouseConfig(DBConfig):
     enable_flamegraph: bool = False
     flamegraph_real_time_period_ns: int = 10_000_000
     flamegraph_cpu_time_period_ns: int = 10_000_000
+    # Server-level setting (bytes). Docs default is 5 GiB.
+    vector_similarity_index_cache_size: int = 5 * 1024 * 1024 * 1024
 
     def to_dict(self) -> ClickhouseConfigDict:
         pwd_str = self.password.get_secret_value()
@@ -41,6 +44,7 @@ class ClickhouseConfig(DBConfig):
             "enable_flamegraph": self.enable_flamegraph,
             "flamegraph_real_time_period_ns": self.flamegraph_real_time_period_ns,
             "flamegraph_cpu_time_period_ns": self.flamegraph_cpu_time_period_ns,
+            "vector_similarity_index_cache_size": self.vector_similarity_index_cache_size,
         }
 
 

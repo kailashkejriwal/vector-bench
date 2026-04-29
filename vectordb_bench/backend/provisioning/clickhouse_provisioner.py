@@ -36,6 +36,7 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
     env = [f"CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1", f"CLICKHOUSE_PASSWORD={DEFAULT_PASSWORD}"]
     _pending_context: dict | None = None
     _trace_log_mount_dir: pathlib.Path | None = None
+    _vector_cache_mount_dir: pathlib.Path | None = None
 
     def _get_extra_container_args(self) -> list[str]:
         """Mount CLICKHOUSE_DATA_DIR to /var/lib/clickhouse when set (e.g. NVMe disk)."""
@@ -49,6 +50,7 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
 
         if self._should_enable_trace_log():
             args.extend(self._trace_log_mount_args())
+        args.extend(self._vector_cache_mount_args())
 
         if getattr(config, "CLICKHOUSE_DOCKER_ENABLE_PROFILE_PERMISSIONS", False):
             args.extend(["--cap-add", "SYS_PTRACE", "--security-opt", "seccomp=unconfined"])
@@ -90,6 +92,33 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
         return [
             "-v",
             f"{trace_xml}:/etc/clickhouse-server/config.d/vectordb_bench_trace_log.xml:ro",
+        ]
+
+    def _vector_cache_mount_args(self) -> list[str]:
+        db_cfg = (self._pending_context or {}).get("db_config")
+        requested = int(getattr(db_cfg, "vector_similarity_index_cache_size", 5 * 1024**3) or 0)
+        default_value = 5 * 1024**3
+        # ClickHouse docs default is 5 GiB. Only mount custom server config when user changed it.
+        if requested <= 0 or requested == default_value:
+            return []
+
+        mount_root = pathlib.Path(tempfile.gettempdir()) / "vectordb_bench_clickhouse_config"
+        mount_dir = mount_root / uuid.uuid4().hex
+        mount_dir.mkdir(parents=True, exist_ok=True)
+        vector_cache_xml = mount_dir / "vectordb_bench_vector_cache.xml"
+        vector_cache_xml.write_text(
+            (
+                "<clickhouse>\n"
+                f"  <vector_similarity_index_cache_size>{requested}</vector_similarity_index_cache_size>\n"
+                "</clickhouse>\n"
+            ),
+            encoding="utf-8",
+        )
+        self._vector_cache_mount_dir = mount_dir
+        log.info("ClickHouse: set vector_similarity_index_cache_size=%s bytes", requested)
+        return [
+            "-v",
+            f"{vector_cache_xml}:/etc/clickhouse-server/config.d/vectordb_bench_vector_cache.xml:ro",
         ]
 
     def _wait_until_ready(self, host: str, port: int, timeout_sec: int = 600) -> None:
@@ -145,3 +174,9 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
                 except Exception as e:
                     log.warning("ClickHouse: failed to remove temporary trace_log mount dir: %s", e)
             self._trace_log_mount_dir = None
+            if self._vector_cache_mount_dir and self._vector_cache_mount_dir.exists():
+                try:
+                    shutil.rmtree(self._vector_cache_mount_dir, ignore_errors=True)
+                except Exception as e:
+                    log.warning("ClickHouse: failed to remove temporary vector-cache mount dir: %s", e)
+            self._vector_cache_mount_dir = None

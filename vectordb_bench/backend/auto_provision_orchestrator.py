@@ -46,6 +46,7 @@ def _merge_provisioned_db_config(db: DB, provisioned: object, previous: object) 
             "enable_flamegraph",
             "flamegraph_real_time_period_ns",
             "flamegraph_cpu_time_period_ns",
+            "vector_similarity_index_cache_size",
         ):
             if hasattr(previous, key):
                 updates[key] = getattr(previous, key)

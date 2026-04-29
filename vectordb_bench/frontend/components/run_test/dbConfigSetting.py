@@ -13,6 +13,22 @@ from vectordb_bench.frontend.config.parameter_tooltips import (
 )
 from vectordb_bench.frontend.utils import inputIsPassword
 
+_CACHE_SIZE_KEY = "vector_similarity_index_cache_size"
+_SIZE_UNITS: dict[str, int] = {
+    "MB": 1024**2,
+    "GB": 1024**3,
+    "TB": 1024**4,
+}
+
+
+def _bytes_to_value_unit(total_bytes: int) -> tuple[int, str]:
+    for unit in ("TB", "GB", "MB"):
+        factor = _SIZE_UNITS[unit]
+        if total_bytes >= factor and total_bytes % factor == 0:
+            return total_bytes // factor, unit
+    # Fallback for non-round values: represent in MB.
+    return max(1, total_bytes // _SIZE_UNITS["MB"]), "MB"
+
 
 def _expanded_instances(actived_db_list: list[DB], instance_count: dict[DB, int]):
     """Yield (db, instance_idx) for each instance to configure (0-based index)."""
@@ -207,6 +223,27 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     key=f"{key_prefix}{key}",
                     help=tooltip or None,
                 )
+            elif key == _CACHE_SIZE_KEY:
+                default_bytes = int(prop.get("default", 5 * 1024**3) or 5 * 1024**3)
+                default_value, default_unit = _bytes_to_value_unit(default_bytes)
+                size_col, unit_col = column.columns(2)
+                size_value = int(
+                    size_col.number_input(
+                        f"{key} value",
+                        min_value=1,
+                        value=default_value,
+                        step=1,
+                        key=f"{key_prefix}{key}-value",
+                        help=tooltip or None,
+                    )
+                )
+                unit_value = unit_col.selectbox(
+                    f"{key} unit",
+                    options=list(_SIZE_UNITS.keys()),
+                    index=list(_SIZE_UNITS.keys()).index(default_unit),
+                    key=f"{key_prefix}{key}-unit",
+                )
+                dbConfig[key] = size_value * _SIZE_UNITS[unit_value]
             else:
                 input_value = column.text_input(
                     key,

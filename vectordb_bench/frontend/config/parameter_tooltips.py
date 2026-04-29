@@ -226,6 +226,7 @@ DB_CONFIG_TOOLTIPS: dict[str, str] = {
     "enable_flamegraph": "ClickHouse only: enable query profiler + introspection settings for flamegraph collection. Performance impact: Adds overhead; enable for diagnostics, disable for baseline benchmarks.",
     "flamegraph_real_time_period_ns": "ClickHouse only: wall-clock sampling period in nanoseconds for query profiler. Lower values increase sample detail and overhead.",
     "flamegraph_cpu_time_period_ns": "ClickHouse only: CPU-time sampling period in nanoseconds for query profiler. Lower values increase sample detail and overhead.",
+    "vector_similarity_index_cache_size": "ClickHouse only: server cache size for vector similarity indexes. Performance impact: Larger cache improves repeat query latency/throughput but consumes more RAM.",
 }
 
 # DB config keys grouped for section headers (order preserved)
@@ -235,6 +236,7 @@ DB_CONFIG_GROUP_ORDER: list[tuple[str, list[str]]] = [
         "Profiling",
         ["enable_flamegraph", "flamegraph_real_time_period_ns", "flamegraph_cpu_time_period_ns"],
     ),
+    ("Performance cache", ["vector_similarity_index_cache_size"]),
     ("Result labeling", ["db_label", "version", "note"]),
     ("Instance resources (GB)", ["cpu", "memory"]),
 ]
