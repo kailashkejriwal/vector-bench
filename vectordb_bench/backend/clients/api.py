@@ -93,7 +93,7 @@ class DBConfig(ABC, BaseModel):
     def to_dict(self) -> dict:
         raise NotImplementedError
 
-    @validator("*")
+    @validator("*", allow_reuse=True)
     def not_empty_field(cls, v: any, field: any):
         if field.name in cls.common_short_configs() or field.name in cls.common_long_configs():
             return v
