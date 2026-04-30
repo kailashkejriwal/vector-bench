@@ -20,6 +20,7 @@ class ClickhouseConfigDict(TypedDict):
     mark_cache_size: int
     local_filesystem_read_method: str
     clickhouse_server_version: str
+    query_plan_optimize_lazy_materialization: bool
 
 
 class ClickhouseConfig(DBConfig):
@@ -40,6 +41,8 @@ class ClickhouseConfig(DBConfig):
     local_filesystem_read_method: str = "pread"
     # Docker auto-provision image tag/version (LTS default).
     clickhouse_server_version: str = "25.8"
+    # Session-level planner optimization toggle.
+    query_plan_optimize_lazy_materialization: bool = False
 
     def to_dict(self) -> ClickhouseConfigDict:
         pwd_str = self.password.get_secret_value()
@@ -57,6 +60,7 @@ class ClickhouseConfig(DBConfig):
             "mark_cache_size": self.mark_cache_size,
             "local_filesystem_read_method": self.local_filesystem_read_method,
             "clickhouse_server_version": self.clickhouse_server_version,
+            "query_plan_optimize_lazy_materialization": self.query_plan_optimize_lazy_materialization,
         }
 
 

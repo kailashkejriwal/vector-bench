@@ -17,6 +17,7 @@ _CACHE_SIZE_KEYS = {"vector_similarity_index_cache_size", "mark_cache_size"}
 _READ_METHOD_KEY = "local_filesystem_read_method"
 _READ_METHOD_OPTIONS = ["pread", "read", "mmap", "io_uring"]
 _CLICKHOUSE_VERSION_KEY = "clickhouse_server_version"
+_CLICKHOUSE_BOOLEAN_KEYS = {"query_plan_optimize_lazy_materialization"}
 _SIZE_UNITS: dict[str, int] = {
     "MB": 1024**2,
     "GB": 1024**3,
@@ -265,6 +266,14 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     value=default_version,
                     key=f"{key_prefix}{key}",
                     placeholder="e.g. 25.8 (LTS), 26.5, 26.5.1.1, latest",
+                    help=tooltip or None,
+                )
+            elif key in _CLICKHOUSE_BOOLEAN_KEYS:
+                default_value = bool(prop.get("default", False))
+                dbConfig[key] = column.checkbox(
+                    key,
+                    value=default_value,
+                    key=f"{key_prefix}{key}",
                     help=tooltip or None,
                 )
             else:

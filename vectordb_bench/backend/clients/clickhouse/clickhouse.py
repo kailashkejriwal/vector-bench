@@ -33,6 +33,8 @@ def _clickhouse_thread_cap_settings(
     fs_read_method = str((db_config or {}).get("local_filesystem_read_method", "") or "").strip()
     if fs_read_method:
         out["local_filesystem_read_method"] = fs_read_method
+    if bool((db_config or {}).get("query_plan_optimize_lazy_materialization", False)):
+        out["query_plan_optimize_lazy_materialization"] = 1
     if enable_flamegraph:
         real_time_period_ns = int(
             (db_config or {}).get(

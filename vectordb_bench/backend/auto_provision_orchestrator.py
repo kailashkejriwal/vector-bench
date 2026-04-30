@@ -50,6 +50,7 @@ def _merge_provisioned_db_config(db: DB, provisioned: object, previous: object) 
             "mark_cache_size",
             "local_filesystem_read_method",
             "clickhouse_server_version",
+            "query_plan_optimize_lazy_materialization",
         ):
             if hasattr(previous, key):
                 updates[key] = getattr(previous, key)
