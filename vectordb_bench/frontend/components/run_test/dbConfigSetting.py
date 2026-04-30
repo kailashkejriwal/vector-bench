@@ -16,6 +16,7 @@ from vectordb_bench.frontend.utils import inputIsPassword
 _CACHE_SIZE_KEYS = {"vector_similarity_index_cache_size", "mark_cache_size"}
 _READ_METHOD_KEY = "local_filesystem_read_method"
 _READ_METHOD_OPTIONS = ["pread", "read", "mmap", "io_uring"]
+_CLICKHOUSE_VERSION_KEY = "clickhouse_server_version"
 _SIZE_UNITS: dict[str, int] = {
     "MB": 1024**2,
     "GB": 1024**3,
@@ -255,6 +256,15 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     options=_READ_METHOD_OPTIONS,
                     index=_READ_METHOD_OPTIONS.index(default_method),
                     key=f"{key_prefix}{key}",
+                    help=tooltip or None,
+                )
+            elif key == _CLICKHOUSE_VERSION_KEY:
+                default_version = str(prop.get("default", "25.8") or "25.8").strip()
+                dbConfig[key] = column.text_input(
+                    key,
+                    value=default_version,
+                    key=f"{key_prefix}{key}",
+                    placeholder="e.g. 25.8 (LTS), 26.5, 26.5.1.1, latest",
                     help=tooltip or None,
                 )
             else:

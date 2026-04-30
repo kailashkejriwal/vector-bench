@@ -55,19 +55,33 @@ def _du_user(path: pathlib.Path) -> int:
     return 0
 
 
-def _walk_file_bytes_sum(path: pathlib.Path) -> int:
+def _walk_file_bytes_sum(path: pathlib.Path) -> tuple[int, bool]:
+    """Return (bytes_sum, had_permission_error) from recursive walk."""
     total = 0
+    had_perm_error = False
     try:
         for root, _dirs, files in os.walk(path, followlinks=False):
             for name in files:
                 fp = pathlib.Path(root) / name
                 try:
                     total += fp.stat(follow_symlinks=False).st_size
+                except PermissionError:
+                    had_perm_error = True
+                except OSError:
+                    pass
+            # Access check for subdirectories; os.walk can silently skip unreadable children.
+            for d in _dirs:
+                dp = pathlib.Path(root) / d
+                try:
+                    _ = dp.iterdir()
+                    next(_, None)
+                except PermissionError:
+                    had_perm_error = True
                 except OSError:
                     pass
     except OSError as e:
         log.debug("directory_size_bytes walk failed for %s: %s", path, e)
-    return total
+    return total, had_perm_error
 
 
 def _du_sudo(path: pathlib.Path) -> int:
@@ -142,7 +156,12 @@ def directory_size_bytes(path: pathlib.Path) -> int:
     n = _du_user(path)
     if n > 0:
         return n
-    n = _walk_file_bytes_sum(path)
+    n, had_perm_error = _walk_file_bytes_sum(path)
+    if had_perm_error:
+        log.debug("disk usage: permission-limited walk for %s; trying elevated du", path)
+        elevated = _elevated_du(path)
+        if elevated > 0:
+            return elevated
     if n > 0:
         return n
 

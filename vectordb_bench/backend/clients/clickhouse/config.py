@@ -19,6 +19,7 @@ class ClickhouseConfigDict(TypedDict):
     vector_similarity_index_cache_size: int
     mark_cache_size: int
     local_filesystem_read_method: str
+    clickhouse_server_version: str
 
 
 class ClickhouseConfig(DBConfig):
@@ -37,6 +38,8 @@ class ClickhouseConfig(DBConfig):
     mark_cache_size: int = 5 * 1024 * 1024 * 1024
     # Session-level filesystem read method.
     local_filesystem_read_method: str = "pread"
+    # Docker auto-provision image tag/version (LTS default).
+    clickhouse_server_version: str = "25.8"
 
     def to_dict(self) -> ClickhouseConfigDict:
         pwd_str = self.password.get_secret_value()
@@ -53,6 +56,7 @@ class ClickhouseConfig(DBConfig):
             "vector_similarity_index_cache_size": self.vector_similarity_index_cache_size,
             "mark_cache_size": self.mark_cache_size,
             "local_filesystem_read_method": self.local_filesystem_read_method,
+            "clickhouse_server_version": self.clickhouse_server_version,
         }
 
 

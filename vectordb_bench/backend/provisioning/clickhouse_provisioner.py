@@ -19,8 +19,8 @@ log = logging.getLogger(__name__)
 # ClickHouse needs extra time after TCP bind before native protocol handshake succeeds.
 CLICKHOUSE_POST_READINESS_DELAY_SEC = 10
 
-# Always use latest image (pulled via --pull always in docker_base)
-CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:latest"
+# Default to LTS image tag; can be overridden per-run from UI.
+CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.8"
 # Native TCP port for clickhouse-driver (HTTP would be 8123)
 CLICKHOUSE_NATIVE_PORT = 9000
 DEFAULT_USER = "default"
@@ -37,6 +37,16 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
     _pending_context: dict | None = None
     _trace_log_mount_dir: pathlib.Path | None = None
     _vector_cache_mount_dir: pathlib.Path | None = None
+
+    def _resolve_image(self) -> str:
+        db_cfg = (self._pending_context or {}).get("db_config")
+        requested = str(getattr(db_cfg, "clickhouse_server_version", "") or "").strip()
+        if not requested:
+            return CLICKHOUSE_IMAGE
+        # Allow full image refs, otherwise treat as version/tag.
+        if "/" in requested:
+            return requested
+        return f"clickhouse/clickhouse-server:{requested}"
 
     def _get_extra_container_args(self) -> list[str]:
         """Mount CLICKHOUSE_DATA_DIR to /var/lib/clickhouse when set (e.g. NVMe disk)."""
@@ -150,6 +160,8 @@ class ClickhouseDockerProvisioner(DockerContainerProvisioner):
     ) -> ConnectionInfo:
         self._pending_context = context or {}
         try:
+            self.image = self._resolve_image()
+            log.info("ClickHouse: using Docker image %s", self.image)
             return super().provision(resource_profile, instance_config, context)
         finally:
             self._pending_context = None

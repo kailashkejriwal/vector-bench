@@ -49,6 +49,7 @@ def _merge_provisioned_db_config(db: DB, provisioned: object, previous: object) 
             "vector_similarity_index_cache_size",
             "mark_cache_size",
             "local_filesystem_read_method",
+            "clickhouse_server_version",
         ):
             if hasattr(previous, key):
                 updates[key] = getattr(previous, key)

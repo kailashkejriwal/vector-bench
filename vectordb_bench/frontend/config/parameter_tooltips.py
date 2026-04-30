@@ -229,6 +229,7 @@ DB_CONFIG_TOOLTIPS: dict[str, str] = {
     "vector_similarity_index_cache_size": "ClickHouse only: server cache size for vector similarity indexes. Performance impact: Larger cache improves repeat query latency/throughput but consumes more RAM.",
     "mark_cache_size": "ClickHouse only (`mark_cache_size`): server mark cache size in bytes. Performance impact: larger cache can reduce mark reads (e.g., WaitMarksLoadMicroseconds) but uses more RAM.",
     "local_filesystem_read_method": "ClickHouse only (`local_filesystem_read_method`): filesystem read strategy for local disks. Try `pread` to reduce contention on mixed/random IO workloads.",
+    "clickhouse_server_version": "ClickHouse auto-provision only (`clickhouse/clickhouse-server:<tag>`): Docker image version/tag. Default uses LTS; set e.g. `26.5` to test a newer release.",
 }
 
 # DB config keys grouped for section headers (order preserved)
@@ -240,6 +241,7 @@ DB_CONFIG_GROUP_ORDER: list[tuple[str, list[str]]] = [
     ),
     ("Performance cache", ["vector_similarity_index_cache_size"]),
     ("Storage IO tuning", ["mark_cache_size", "local_filesystem_read_method"]),
+    ("Provisioning", ["clickhouse_server_version"]),
     ("Result labeling", ["db_label", "version", "note"]),
     ("Instance resources (GB)", ["cpu", "memory"]),
 ]
