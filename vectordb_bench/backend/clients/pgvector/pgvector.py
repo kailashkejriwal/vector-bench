@@ -523,6 +523,30 @@ class PgVector(VectorDB):
 
         self._search = self._generate_search_query()
 
+    def update_embeddings(
+        self,
+        embeddings: list[list[float]],
+        metadata: list[int],
+        labels_data: list[str] | None = None,
+        **kwargs: Any,
+    ) -> tuple[int, Exception | None]:
+        assert self.conn is not None, "Connection is not initialized"
+        assert self.cursor is not None, "Cursor is not initialized"
+        if len(embeddings) != len(metadata):
+            return 0, ValueError("embeddings and metadata length must match")
+        try:
+            update_sql = sql.SQL("UPDATE public.{table_name} SET embedding = %s WHERE {primary_field} = %s").format(
+                table_name=sql.Identifier(self.table_name),
+                primary_field=sql.Identifier(self._primary_field),
+            )
+            rows = [(np.asarray(embeddings[i]), int(metadata[i])) for i in range(len(metadata))]
+            self.cursor.executemany(update_sql, rows)
+            self.conn.commit()
+            return len(metadata), None
+        except Exception as e:
+            log.warning(f"Failed to update data into pgvector table ({self.table_name}), error: {e}")
+            return 0, e
+
     def search_embedding(
         self,
         query: list[float],

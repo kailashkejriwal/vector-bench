@@ -305,3 +305,38 @@ class QdrantLocal(VectorDB):
         ).points
 
         return [result.id for result in res]
+
+    def update_embeddings(
+        self,
+        embeddings: Iterable[list[float]],
+        metadata: list[int],
+        labels_data: list[str] | None = None,
+        **kwargs,
+    ) -> tuple[int, Exception | None]:
+        assert self.client is not None
+        emb_list = list(embeddings)
+        if len(emb_list) != len(metadata):
+            return 0, ValueError("embeddings and metadata length must match")
+        if self.with_scalar_labels and labels_data is None:
+            return 0, ValueError("labels_data must be provided for scalar-label collections")
+
+        updated = 0
+        try:
+            for offset in range(0, len(emb_list), QDRANT_BATCH_SIZE):
+                vectors = emb_list[offset : offset + QDRANT_BATCH_SIZE]
+                ids = metadata[offset : offset + QDRANT_BATCH_SIZE]
+                if self.with_scalar_labels:
+                    labels = labels_data[offset : offset + QDRANT_BATCH_SIZE]
+                    payloads = [{self._primary_field: pk, self._scalar_label_field: labels[i]} for i, pk in enumerate(ids)]
+                else:
+                    payloads = [{self._primary_field: pk} for pk in ids]
+                self.client.upsert(
+                    collection_name=self.collection_name,
+                    wait=True,
+                    points=Batch(ids=ids, payloads=payloads, vectors=vectors),
+                )
+                updated += len(ids)
+            return updated, None
+        except Exception as e:
+            log.info(f"Failed to update data, {e}")
+            return updated, e

@@ -262,11 +262,13 @@ class SerialUpdateRunner:
         embeddings: list[list[float]],
         metadata: list[int],
         batch_size: int,
+        labels_data: list[str] | None = None,
     ):
         self.db = db
         self.embeddings = embeddings
         self.metadata = metadata
         self.batch_size = max(1, int(batch_size))
+        self.labels_data = labels_data
 
     def _run_once(self) -> tuple[int, float, float]:
         if not self.metadata:
@@ -279,10 +281,12 @@ class SerialUpdateRunner:
             for i in range(0, len(self.metadata), self.batch_size):
                 batch_ids = self.metadata[i : i + self.batch_size]
                 batch_embeddings = self.embeddings[i : i + self.batch_size]
+                batch_labels = self.labels_data[i : i + self.batch_size] if self.labels_data else None
                 batch_start = time.perf_counter()
                 updated, error = self.db.update_embeddings(
                     embeddings=batch_embeddings,
                     metadata=batch_ids,
+                    labels_data=batch_labels,
                 )
                 if error is not None:
                     raise RuntimeError(f"update failed: {error}") from None

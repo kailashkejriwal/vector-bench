@@ -24,6 +24,9 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     ef_construct: int
     hnsw_ef: int | None = 0
     on_disk: bool | None = False
+    enable_update_stage: bool = False
+    update_ratio: float = 0.001
+    update_batch_size: int = 100
 
     def parse_metric(self) -> str:
         if self.metric_type == MetricType.L2:

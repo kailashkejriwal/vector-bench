@@ -907,6 +907,15 @@ CaseConfigParamInput_UpdateBatchSize_Clickhouse = CaseConfigInput(
     inputConfig={"min": 1, "max": 10_000, "value": 100, "step": 1},
     isDisplayed=lambda config: bool(config.get(_opt_param("enable_update_stage"), False)),
 )
+CaseConfigParamInput_EnableUpdateStage = CaseConfigParamInput_EnableUpdateStage_Clickhouse.copy(
+    update={"displayLabel": "Enable update stage"}
+)
+CaseConfigParamInput_UpdateRatio = CaseConfigParamInput_UpdateRatio_Clickhouse.copy(
+    update={"displayLabel": "Update ratio"}
+)
+CaseConfigParamInput_UpdateBatchSize = CaseConfigParamInput_UpdateBatchSize_Clickhouse.copy(
+    update={"displayLabel": "Update batch size"}
+)
 
 CaseConfigParamInput_SQType = CaseConfigInput(
     label=CaseConfigParamType.sq_type,
@@ -2323,6 +2332,9 @@ MilvusPerformanceConfig = [
     CaseConfigParamInput_RefineType,
     CaseConfigParamInput_RefineK,
     CaseConfigParamInput_Milvus_use_partition_key,
+    CaseConfigParamInput_EnableUpdateStage,
+    CaseConfigParamInput_UpdateRatio,
+    CaseConfigParamInput_UpdateBatchSize,
 ]
 
 CaseConfigParamInput_dynamicEfFactor_Weaviate = CaseConfigInput(
@@ -2404,7 +2416,12 @@ QdrantLocalLoadConfig = [
     CaseConfigParamInput_hnsw_ef_QdrantLocal,
     CaseConfigParamInput_on_disk_QdrantLocal,
 ]
-QdrantLocalPerformanceConfig = QdrantLocalLoadConfig
+QdrantLocalPerformanceConfig = [
+    *QdrantLocalLoadConfig,
+    CaseConfigParamInput_EnableUpdateStage,
+    CaseConfigParamInput_UpdateRatio,
+    CaseConfigParamInput_UpdateBatchSize,
+]
 
 ESLoadingConfig = [
     CaseConfigParamInput_IndexType_ES,
@@ -2470,6 +2487,9 @@ PgVectorPerformanceConfig = [
     CaseConfigParamInput_reranking_PgVector,
     CaseConfigParamInput_reranking_metric_PgVector,
     CaseConfigParamInput_quantized_fetch_limit_PgVector,
+    CaseConfigParamInput_EnableUpdateStage,
+    CaseConfigParamInput_UpdateRatio,
+    CaseConfigParamInput_UpdateBatchSize,
 ]
 
 PgVectoRSLoadingConfig = [

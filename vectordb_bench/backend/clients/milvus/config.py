@@ -38,6 +38,9 @@ class MilvusIndexConfig(BaseModel):
     index: IndexType
     metric_type: MetricType | None = None
     use_partition_key: bool = False  # for label-filter
+    enable_update_stage: bool = False
+    update_ratio: float = 0.001
+    update_batch_size: int = 100
 
     @property
     def is_gpu_index(self) -> bool:

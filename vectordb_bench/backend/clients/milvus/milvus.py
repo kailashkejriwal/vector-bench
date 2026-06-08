@@ -270,6 +270,43 @@ class Milvus(VectorDB):
             return insert_count, e
         return insert_count, None
 
+    def update_embeddings(
+        self,
+        embeddings: Iterable[list[float]],
+        metadata: list[int],
+        labels_data: list[str] | None = None,
+        **kwargs,
+    ) -> tuple[int, Exception | None]:
+        assert self.col is not None
+        emb_list = list(embeddings)
+        if len(emb_list) != len(metadata):
+            return 0, ValueError("embeddings and metadata length must match")
+        if self.with_scalar_labels and labels_data is None:
+            return 0, ValueError("labels_data must be provided for scalar-label collections")
+
+        updated = 0
+        try:
+            for batch_start in range(0, len(emb_list), self.batch_size):
+                batch_end = min(batch_start + self.batch_size, len(emb_list))
+                batch_ids = metadata[batch_start:batch_end]
+                batch_vecs = emb_list[batch_start:batch_end]
+                batch_data = [batch_ids, batch_ids, batch_vecs]
+                if self.with_scalar_labels:
+                    batch_data.append(labels_data[batch_start:batch_end])
+
+                if hasattr(self.col, "upsert"):
+                    res = self.col.upsert(batch_data)
+                    updated += len(res.primary_keys)
+                else:
+                    id_list = ",".join(map(str, batch_ids))
+                    self.col.delete(f"{self._primary_field} in [{id_list}]")
+                    res = self.col.insert(batch_data)
+                    updated += len(res.primary_keys)
+            return updated, None
+        except MilvusException as e:
+            log.info(f"Failed to update data: {e}")
+            return updated, e
+
     def prepare_filter(self, filters: Filter):
         if filters.type == FilterOp.NonFilter:
             self.expr = ""

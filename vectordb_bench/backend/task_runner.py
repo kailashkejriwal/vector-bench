@@ -16,6 +16,7 @@ from .bench_disk_usage import apply_disk_usage_sample
 from .cases import Case, CaseLabel, StreamingPerformanceCase
 from .clients import DB, MetricType, api
 from .data_source import DatasetSource
+from .filter import FilterOp
 from .runner import (
     MultiProcessingSearchRunner,
     ReadWriteRunner,
@@ -278,7 +279,7 @@ class CaseRunner(BaseModel):
             return 0, 0.0, 0.0
 
         batch_size = int(getattr(self.config.db_case_config, "update_batch_size", 100) or 100)
-        ids, vectors = self._build_update_payload(ratio)
+        ids, vectors, labels = self._build_update_payload(ratio)
         if not ids:
             return 0, 0.0, 0.0
 
@@ -287,6 +288,7 @@ class CaseRunner(BaseModel):
             embeddings=vectors,
             metadata=ids,
             batch_size=batch_size,
+            labels_data=labels,
         )
         try:
             (updated_count, duration, p99), _ = self.update_runner.run()
@@ -300,10 +302,11 @@ class CaseRunner(BaseModel):
                 return 0, 0.0, 0.0
             raise
 
-    def _build_update_payload(self, ratio: float) -> tuple[list[int], list[list[float]]]:
+    def _build_update_payload(self, ratio: float) -> tuple[list[int], list[list[float]], list[str] | None]:
         target = max(1, int(self.ca.dataset.data.size * ratio))
         ids: list[int] = []
         vectors: list[list[float]] = []
+        labels: list[str] | None = [] if self.ca.with_scalar_labels else None
         for data_df in self.ca.dataset:
             batch_ids = data_df[self.ca.dataset.data.train_id_field].tolist()
             emb_np = np.stack(data_df[self.ca.dataset.data.train_vector_field])
@@ -312,14 +315,26 @@ class CaseRunner(BaseModel):
             # Slight deterministic perturbation to avoid no-op updates.
             emb_np = emb_np * 0.9999
 
+            labels_data = None
+            if labels is not None:
+                if self.ca.filters.type == FilterOp.StrEqual:
+                    if self.ca.dataset.data.scalar_labels_file_separated:
+                        labels_data = self.ca.dataset.scalar_labels[self.ca.filters.label_field][batch_ids].to_list()
+                    else:
+                        labels_data = data_df[self.ca.filters.label_field].tolist()
+                else:
+                    labels_data = ["" for _ in batch_ids]
+
             take = min(target - len(ids), len(batch_ids))
             if take <= 0:
                 break
             ids.extend(int(x) for x in batch_ids[:take])
             vectors.extend(emb_np[:take].tolist())
+            if labels is not None and labels_data is not None:
+                labels.extend(labels_data[:take])
             if len(ids) >= target:
                 break
-        return ids, vectors
+        return ids, vectors, labels
 
     def _run_streaming_case(self) -> Metric:
         log.info("Start streaming case")

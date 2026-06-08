@@ -63,6 +63,9 @@ class PgVectorIndexConfig(BaseModel, DBCaseConfig):
     metric_type: MetricType | None = None
     create_index_before_load: bool = False
     create_index_after_load: bool = True
+    enable_update_stage: bool = False
+    update_ratio: float = 0.001
+    update_batch_size: int = 100
     # Scan more of the index to get enough results for filter-cases.
     # Options: "strict_order" (order by distance), "relaxed_order" (slightly out of order but better recall)
     # See: https://github.com/pgvector/pgvector?tab=readme-ov-file#iterative-index-scans
