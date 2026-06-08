@@ -317,6 +317,37 @@ class Clickhouse(VectorDB):
             )
             return 0, e
 
+    def update_embeddings(
+        self,
+        embeddings: list[list[float]],
+        metadata: list[int],
+        labels_data: list[str] | None = None,
+        **kwargs: Any,
+    ) -> tuple[int, Exception | None]:
+        assert self.conn is not None, "Connection is not initialized"
+        if len(embeddings) != len(metadata):
+            return 0, ValueError("embeddings and metadata length must match")
+
+        db = self.db_config["database"]
+        table = self.table_name
+        updated = 0
+        try:
+            # ClickHouse UPDATE is mutation-based; mutations_sync=2 blocks until complete
+            # so benchmark timings reflect committed updates.
+            sql = (
+                f"ALTER TABLE {db}.{table} "
+                f"UPDATE {self._vector_field} = %(embedding)s "
+                f"WHERE {self._primary_field} = %(id)s "
+                "SETTINGS mutations_sync = 2"
+            )
+            for vector, item_id in zip(embeddings, metadata):
+                self.conn.execute(sql, {"embedding": vector, "id": int(item_id)})
+                updated += 1
+            return updated, None
+        except Exception as e:
+            log.warning("Failed to update data in Clickhouse table (%s): %s", self.table_name, e)
+            return updated, e
+
     def search_embedding(
         self,
         query: list[float],

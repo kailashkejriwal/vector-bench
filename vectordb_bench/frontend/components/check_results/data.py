@@ -19,6 +19,7 @@ TUNING_DISPLAY_KEYS = {
     "nlist", "nprobe", "lists", "probes", "quantization", "granularity",
     "metric_type", "vector_data_type", "num_candidates", "search_list",
     "m", "num_leaves", "num_leaves_to_search", "quantizer", "reranking",
+    "enable_update_stage", "update_ratio", "update_batch_size",
 }
 
 

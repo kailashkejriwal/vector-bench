@@ -2,7 +2,7 @@ from vectordb_bench.backend.cases import CaseLabel, CaseType
 from vectordb_bench.backend.clients import DB
 from vectordb_bench.backend.provisioning.base import InstanceConfig
 from vectordb_bench.frontend.config.dbCaseConfigs import get_case_config_inputs
-from vectordb_bench.models import CaseConfig, CaseConfigParamType, TaskConfig
+from vectordb_bench.models import ALL_TASK_STAGES, CaseConfig, CaseConfigParamType, TaskConfig, TaskStage
 
 
 def _case_label_for_type(case_type: CaseType) -> CaseLabel:
@@ -65,6 +65,12 @@ def generate_tasks(
                 case_config=case,
                 db_case_config=db.case_config_cls(all_case_configs[key][case].get(CaseConfigParamType.IndexType, None))(
                     **cfg
+                ),
+                stages=list(ALL_TASK_STAGES)
+                + (
+                    [TaskStage.UPDATE]
+                    if bool(cfg.get(CaseConfigParamType.enable_update_stage.value, False))
+                    else []
                 ),
                 auto_start=auto_start,
                 instance_config=InstanceConfig(**instance_config) if instance_config and isinstance(instance_config, dict) else None,

@@ -255,6 +255,51 @@ class SerialInsertRunner:
         return count, duration
 
 
+class SerialUpdateRunner:
+    def __init__(
+        self,
+        db: api.VectorDB,
+        embeddings: list[list[float]],
+        metadata: list[int],
+        batch_size: int,
+    ):
+        self.db = db
+        self.embeddings = embeddings
+        self.metadata = metadata
+        self.batch_size = max(1, int(batch_size))
+
+    def _run_once(self) -> tuple[int, float, float]:
+        if not self.metadata:
+            return 0, 0.0, 0.0
+
+        total_updated = 0
+        per_row_latencies: list[float] = []
+        start = time.perf_counter()
+        with self.db.init():
+            for i in range(0, len(self.metadata), self.batch_size):
+                batch_ids = self.metadata[i : i + self.batch_size]
+                batch_embeddings = self.embeddings[i : i + self.batch_size]
+                batch_start = time.perf_counter()
+                updated, error = self.db.update_embeddings(
+                    embeddings=batch_embeddings,
+                    metadata=batch_ids,
+                )
+                if error is not None:
+                    raise RuntimeError(f"update failed: {error}") from None
+                total_updated += int(updated)
+                batch_dur = time.perf_counter() - batch_start
+                if updated > 0:
+                    per_row_latencies.append(batch_dur / updated)
+
+        duration = time.perf_counter() - start
+        p99 = round(np.percentile(per_row_latencies, 99), 4) if per_row_latencies else 0.0
+        return total_updated, duration, p99
+
+    @utils.time_it
+    def run(self) -> tuple[int, float, float]:
+        return self._run_once()
+
+
 class SerialSearchRunner:
     def __init__(
         self,

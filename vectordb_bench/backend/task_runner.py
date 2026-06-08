@@ -16,7 +16,13 @@ from .bench_disk_usage import apply_disk_usage_sample
 from .cases import Case, CaseLabel, StreamingPerformanceCase
 from .clients import DB, MetricType, api
 from .data_source import DatasetSource
-from .runner import MultiProcessingSearchRunner, ReadWriteRunner, SerialInsertRunner, SerialSearchRunner
+from .runner import (
+    MultiProcessingSearchRunner,
+    ReadWriteRunner,
+    SerialInsertRunner,
+    SerialSearchRunner,
+    SerialUpdateRunner,
+)
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +57,7 @@ class CaseRunner(BaseModel):
     search_runner: MultiProcessingSearchRunner | None = None
     final_search_runner: MultiProcessingSearchRunner | None = None
     read_write_runner: ReadWriteRunner | None = None
+    update_runner: SerialUpdateRunner | None = None
 
     def __eq__(self, obj: any):
         if isinstance(obj, CaseRunner):
@@ -218,6 +225,17 @@ class CaseRunner(BaseModel):
                     log.info("Data loading skipped")
                     m.write_qps = 0.0
                     m.write_throughput = 0.0
+            if TaskStage.UPDATE in self.config.stages:
+                updated_count, update_dur, update_p99 = self._run_updates()
+                m.update_qps = updated_count / update_dur if update_dur > 0 else 0.0
+                m.update_throughput = m.update_qps
+                m.update_latency_p99 = update_p99
+                log.info(
+                    "Update stage finished: updated=%s, duration=%s, p99=%s",
+                    updated_count,
+                    round(update_dur, 4),
+                    update_p99,
+                )
             if TaskStage.SEARCH_SERIAL in self.config.stages or TaskStage.SEARCH_CONCURRENT in self.config.stages:
                 self._init_search_runner()
                 if TaskStage.SEARCH_CONCURRENT in self.config.stages:
@@ -252,6 +270,56 @@ class CaseRunner(BaseModel):
             m.disk_read_bytes = resource_metrics.get('disk_read_bytes', 0)
             m.disk_write_bytes = resource_metrics.get('disk_write_bytes', 0)
             apply_disk_usage_sample(m, self.config.db, phase="end")
+
+    def _run_updates(self) -> tuple[int, float, float]:
+        ratio = float(getattr(self.config.db_case_config, "update_ratio", 0.001) or 0.001)
+        ratio = max(0.0, min(ratio, 1.0))
+        if ratio <= 0:
+            return 0, 0.0, 0.0
+
+        batch_size = int(getattr(self.config.db_case_config, "update_batch_size", 100) or 100)
+        ids, vectors = self._build_update_payload(ratio)
+        if not ids:
+            return 0, 0.0, 0.0
+
+        self.update_runner = SerialUpdateRunner(
+            db=self.db,
+            embeddings=vectors,
+            metadata=ids,
+            batch_size=batch_size,
+        )
+        try:
+            (updated_count, duration, p99), _ = self.update_runner.run()
+            return updated_count, duration, p99
+        except NotImplementedError:
+            log.info("DB %s does not implement update stage; skipping", self.config.db)
+            return 0, 0.0, 0.0
+        except RuntimeError as e:
+            if "does not support update benchmarking" in str(e):
+                log.info("DB %s does not implement update stage; skipping", self.config.db)
+                return 0, 0.0, 0.0
+            raise
+
+    def _build_update_payload(self, ratio: float) -> tuple[list[int], list[list[float]]]:
+        target = max(1, int(self.ca.dataset.data.size * ratio))
+        ids: list[int] = []
+        vectors: list[list[float]] = []
+        for data_df in self.ca.dataset:
+            batch_ids = data_df[self.ca.dataset.data.train_id_field].tolist()
+            emb_np = np.stack(data_df[self.ca.dataset.data.train_vector_field])
+            if self.normalize:
+                emb_np = emb_np / np.linalg.norm(emb_np, axis=1)[:, np.newaxis]
+            # Slight deterministic perturbation to avoid no-op updates.
+            emb_np = emb_np * 0.9999
+
+            take = min(target - len(ids), len(batch_ids))
+            if take <= 0:
+                break
+            ids.extend(int(x) for x in batch_ids[:take])
+            vectors.extend(emb_np[:take].tolist())
+            if len(ids) >= target:
+                break
+        return ids, vectors
 
     def _run_streaming_case(self) -> Metric:
         log.info("Start streaming case")

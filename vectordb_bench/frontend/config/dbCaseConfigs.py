@@ -28,6 +28,9 @@ class _OptConfigParamType(Enum):
     dynamic_ef_factor = "dynamicEfFactor"
     dynamic_ef_min = "dynamicEfMin"
     dynamic_ef_max = "dynamicEfMax"
+    enable_update_stage = "enable_update_stage"
+    update_ratio = "update_ratio"
+    update_batch_size = "update_batch_size"
 
 
 def _filter_param(name: str):
@@ -879,6 +882,30 @@ CaseConfigParamInput_DistanceThreshold_Clickhouse = CaseConfigInput(
     inputType=InputType.Float,
     inputConfig={"min": 0.0, "max": 1000.0, "value": 0.5, "step": 0.01},
     isDisplayed=lambda config: config.get(_opt_param("query_type"), "order_by_limit") == "distance_threshold",
+)
+CaseConfigParamInput_EnableUpdateStage_Clickhouse = CaseConfigInput(
+    label=_opt_param("enable_update_stage"),
+    displayLabel="Enable update stage",
+    inputHelp="Run an update benchmark stage after loading and before search. Captures update QPS, p99 latency, and throughput.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+    isDisplayed=lambda config: True,
+)
+CaseConfigParamInput_UpdateRatio_Clickhouse = CaseConfigInput(
+    label=_opt_param("update_ratio"),
+    displayLabel="Update ratio",
+    inputHelp="Fraction of loaded vectors to update (0.0 to 1.0). Example: 0.001 updates 0.1% of vectors.",
+    inputType=InputType.Float,
+    inputConfig={"min": 0.0, "max": 1.0, "value": 0.001, "step": 0.001},
+    isDisplayed=lambda config: bool(config.get(_opt_param("enable_update_stage"), False)),
+)
+CaseConfigParamInput_UpdateBatchSize_Clickhouse = CaseConfigInput(
+    label=_opt_param("update_batch_size"),
+    displayLabel="Update batch size",
+    inputHelp="Number of vectors sent per update request. Larger batches improve throughput but can increase tail latency.",
+    inputType=InputType.Number,
+    inputConfig={"min": 1, "max": 10_000, "value": 100, "step": 1},
+    isDisplayed=lambda config: bool(config.get(_opt_param("enable_update_stage"), False)),
 )
 
 CaseConfigParamInput_SQType = CaseConfigInput(
@@ -3056,6 +3083,9 @@ ClickhousePerformanceConfig = [
     CaseConfigParamInput_Granularity_Clickhouse,
     CaseConfigParamInput_QueryType_Clickhouse,
     CaseConfigParamInput_DistanceThreshold_Clickhouse,
+    CaseConfigParamInput_EnableUpdateStage_Clickhouse,
+    CaseConfigParamInput_UpdateRatio_Clickhouse,
+    CaseConfigParamInput_UpdateBatchSize_Clickhouse,
 ]
 
 # Map DB to config

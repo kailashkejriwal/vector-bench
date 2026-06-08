@@ -251,3 +251,16 @@ class VectorDB(ABC):
         Optimize's execution time is limited, the limited time is based on cases.
         """
         raise NotImplementedError
+
+    def update_embeddings(
+        self,
+        embeddings: list[list[float]],
+        metadata: list[int],
+        labels_data: list[str] | None = None,
+        **kwargs,
+    ) -> tuple[int, Exception | None]:
+        """Update existing vectors in the database.
+
+        Databases that support updates should override this method.
+        """
+        return 0, NotImplementedError(f"{self.__class__.__name__} does not support update benchmarking")

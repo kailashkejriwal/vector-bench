@@ -118,6 +118,9 @@ PARAM_TOOLTIPS: dict[str, str] = {
     "dynamicEfFactor": "Weaviate: When ef=-1, multiplier for dynamic ef. Default 8.",
     "dynamicEfMin": "Weaviate: When ef=-1, lower bound for dynamic ef. Default 100.",
     "dynamicEfMax": "Weaviate: When ef=-1, upper bound for dynamic ef. Default 500.",
+    "enable_update_stage": "Run an update benchmark stage after load and before search. Performance impact: Adds extra benchmark time and write load, but captures update behavior.",
+    "update_ratio": "Fraction of vectors to update during update stage (0.0 to 1.0). Performance impact: Higher ratio increases update workload and run time.",
+    "update_batch_size": "Number of vectors per update request. Performance impact: Larger batches usually improve update throughput but may increase p99 latency.",
 }
 
 # ---------------------------------------------------------------------------
@@ -193,6 +196,9 @@ PARAM_GROUPS: dict[str, str] = {
     "dynamicEfFactor": "Weaviate optimization",
     "dynamicEfMin": "Weaviate optimization",
     "dynamicEfMax": "Weaviate optimization",
+    "enable_update_stage": "Update benchmark",
+    "update_ratio": "Update benchmark",
+    "update_batch_size": "Update benchmark",
 }
 
 

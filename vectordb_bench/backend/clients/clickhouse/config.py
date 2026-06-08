@@ -72,6 +72,9 @@ class ClickhouseIndexConfig(BaseModel, DBCaseConfig):
     create_index_after_load: bool = False
     query_type: str = "order_by_limit"  # order_by_limit | distance_threshold
     distance_threshold: float = 0.5
+    enable_update_stage: bool = False
+    update_ratio: float = 0.001
+    update_batch_size: int = 100
 
     def parse_metric(self) -> str:
         if not self.metric_type:

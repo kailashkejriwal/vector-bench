@@ -153,6 +153,9 @@ class CaseConfigParamType(Enum):
     label_percentages = "label_percentages"
     filter_rates = "filter_rates"
     insert_rate = "insert_rate"
+    enable_update_stage = "enable_update_stage"
+    update_ratio = "update_ratio"
+    update_batch_size = "update_batch_size"
     # ClickHouse HNSW optimization
     quantization = "quantization"
     granularity = "granularity"
@@ -230,6 +233,7 @@ class TaskStage(StrEnum):
 
     DROP_OLD = "drop_old"
     LOAD = "load"
+    UPDATE = "update"
     SEARCH_SERIAL = "search_serial"
     SEARCH_CONCURRENT = "search_concurrent"
 
