@@ -75,6 +75,7 @@ class ClickhouseIndexConfig(BaseModel, DBCaseConfig):
     enable_update_stage: bool = False
     update_ratio: float = 0.001
     update_batch_size: int = 100
+    update_query_mode: str = "auto"  # auto | single | batch
 
     def parse_metric(self) -> str:
         if not self.metric_type:

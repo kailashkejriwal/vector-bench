@@ -121,6 +121,7 @@ PARAM_TOOLTIPS: dict[str, str] = {
     "enable_update_stage": "Run an update benchmark stage after load and before search. Performance impact: Adds extra benchmark time and write load, but captures update behavior.",
     "update_ratio": "Fraction of vectors to update during update stage (0.0 to 1.0). Performance impact: Higher ratio increases update workload and run time.",
     "update_batch_size": "Number of vectors per update request. Performance impact: Larger batches usually improve update throughput but may increase p99 latency.",
+    "update_query_mode": "ClickHouse update mode: auto chooses based on batch size (1 -> single, >1 -> batch), single forces one-row UPDATE mutations, batch uses one UPDATE mutation per batch.",
 }
 
 # ---------------------------------------------------------------------------
@@ -199,6 +200,7 @@ PARAM_GROUPS: dict[str, str] = {
     "enable_update_stage": "Update benchmark",
     "update_ratio": "Update benchmark",
     "update_batch_size": "Update benchmark",
+    "update_query_mode": "Update benchmark",
 }
 
 

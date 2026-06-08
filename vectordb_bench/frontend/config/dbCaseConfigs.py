@@ -31,6 +31,7 @@ class _OptConfigParamType(Enum):
     enable_update_stage = "enable_update_stage"
     update_ratio = "update_ratio"
     update_batch_size = "update_batch_size"
+    update_query_mode = "update_query_mode"
 
 
 def _filter_param(name: str):
@@ -905,6 +906,14 @@ CaseConfigParamInput_UpdateBatchSize_Clickhouse = CaseConfigInput(
     inputHelp="Number of vectors sent per update request. Larger batches improve throughput but can increase tail latency.",
     inputType=InputType.Number,
     inputConfig={"min": 1, "max": 10_000, "value": 100, "step": 1},
+    isDisplayed=lambda config: bool(config.get(_opt_param("enable_update_stage"), False)),
+)
+CaseConfigParamInput_UpdateQueryMode_Clickhouse = CaseConfigInput(
+    label=_opt_param("update_query_mode"),
+    displayLabel="Update query mode",
+    inputHelp="auto: choose single when batch size is 1, else batch query. single: force one-row mutations. batch: force one mutation per update batch.",
+    inputType=InputType.Option,
+    inputConfig={"options": ["auto", "single", "batch"]},
     isDisplayed=lambda config: bool(config.get(_opt_param("enable_update_stage"), False)),
 )
 CaseConfigParamInput_EnableUpdateStage = CaseConfigParamInput_EnableUpdateStage_Clickhouse.copy(
@@ -3112,6 +3121,7 @@ ClickhousePerformanceConfig = [
     CaseConfigParamInput_EnableUpdateStage_Clickhouse,
     CaseConfigParamInput_UpdateRatio_Clickhouse,
     CaseConfigParamInput_UpdateBatchSize_Clickhouse,
+    CaseConfigParamInput_UpdateQueryMode_Clickhouse,
 ]
 
 # Map DB to config

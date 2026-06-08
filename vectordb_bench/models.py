@@ -156,6 +156,7 @@ class CaseConfigParamType(Enum):
     enable_update_stage = "enable_update_stage"
     update_ratio = "update_ratio"
     update_batch_size = "update_batch_size"
+    update_query_mode = "update_query_mode"
     # ClickHouse HNSW optimization
     quantization = "quantization"
     granularity = "granularity"

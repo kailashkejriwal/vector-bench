@@ -330,23 +330,51 @@ class Clickhouse(VectorDB):
 
         db = self.db_config["database"]
         table = self.table_name
-        updated = 0
+        requested_mode = str(getattr(self.case_config, "update_query_mode", "auto") or "auto").strip().lower()
+        if requested_mode not in {"auto", "single", "batch"}:
+            requested_mode = "auto"
+        mode = ("single" if len(metadata) <= 1 else "batch") if requested_mode == "auto" else requested_mode
         try:
             # ClickHouse UPDATE is mutation-based; mutations_sync=2 blocks until complete
             # so benchmark timings reflect committed updates.
-            sql = (
+            if mode == "single":
+                sql = (
+                    f"ALTER TABLE {db}.{table} "
+                    f"UPDATE {self._vector_field} = %(embedding)s "
+                    f"WHERE {self._primary_field} = %(id)s "
+                    "SETTINGS mutations_sync = 2"
+                )
+                updated = 0
+                for vector, item_id in zip(embeddings, metadata):
+                    self.conn.execute(sql, {"embedding": vector, "id": int(item_id)})
+                    updated += 1
+                return updated, None
+
+            params: dict[str, Any] = {}
+            conditions: list[str] = []
+            id_placeholders: list[str] = []
+            for idx, (item_id, vector) in enumerate(zip(metadata, embeddings)):
+                id_key = f"id_{idx}"
+                vec_key = f"vec_{idx}"
+                params[id_key] = int(item_id)
+                params[vec_key] = vector
+                conditions.append(f"{self._primary_field} = %({id_key})s")
+                conditions.append(f"cast(%({vec_key})s AS Array(Float32))")
+                id_placeholders.append(f"%({id_key})s")
+
+            vector_expr = f"multiIf({', '.join(conditions)}, {self._vector_field})"
+            where_clause = f"{self._primary_field} IN ({', '.join(id_placeholders)})"
+            batch_sql = (
                 f"ALTER TABLE {db}.{table} "
-                f"UPDATE {self._vector_field} = %(embedding)s "
-                f"WHERE {self._primary_field} = %(id)s "
+                f"UPDATE {self._vector_field} = {vector_expr} "
+                f"WHERE {where_clause} "
                 "SETTINGS mutations_sync = 2"
             )
-            for vector, item_id in zip(embeddings, metadata):
-                self.conn.execute(sql, {"embedding": vector, "id": int(item_id)})
-                updated += 1
-            return updated, None
+            self.conn.execute(batch_sql, params)
+            return len(metadata), None
         except Exception as e:
             log.warning("Failed to update data in Clickhouse table (%s): %s", self.table_name, e)
-            return updated, e
+            return 0, e
 
     def search_embedding(
         self,
