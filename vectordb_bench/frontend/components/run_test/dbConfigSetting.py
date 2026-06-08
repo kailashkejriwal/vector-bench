@@ -18,6 +18,7 @@ _READ_METHOD_KEY = "local_filesystem_read_method"
 _READ_METHOD_OPTIONS = ["pread", "read", "mmap", "io_uring"]
 _CLICKHOUSE_VERSION_KEY = "clickhouse_server_version"
 _CLICKHOUSE_BOOLEAN_KEYS = {"query_plan_optimize_lazy_materialization"}
+_CLICKHOUSE_QUERY_SIZE_KEY = "max_query_size"
 _SIZE_UNITS: dict[str, int] = {
     "MB": 1024**2,
     "GB": 1024**3,
@@ -276,6 +277,20 @@ def dbConfigSettingItem(st, activeDb: DB, instance_idx: int = 0, instance_total:
                     key=f"{key_prefix}{key}",
                     help=tooltip or None,
                 )
+            elif key == _CLICKHOUSE_QUERY_SIZE_KEY:
+                default_bytes = int(prop.get("default", 262_144) or 262_144)
+                default_kb = max(0, default_bytes // 1024)
+                size_kb = int(
+                    column.number_input(
+                        f"{key} (KB)",
+                        min_value=0,
+                        value=default_kb,
+                        step=64,
+                        key=f"{key_prefix}{key}",
+                        help=tooltip or None,
+                    )
+                )
+                dbConfig[key] = size_kb * 1024
             else:
                 input_value = column.text_input(
                     key,

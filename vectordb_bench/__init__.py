@@ -117,6 +117,9 @@ class config:
     # Experimental vector similarity can hit "Too many threads" if this is high and NUM_CONCURRENCY is large.
     # Default 2; set to 1 if errors persist; set 0 to omit (server defaults only — may fail under concurrency).
     CLICKHOUSE_QUERY_MAX_THREADS = env.int("CLICKHOUSE_QUERY_MAX_THREADS", 2)
+    # Max SQL text size in bytes for ClickHouse queries over native protocol.
+    # Useful for large batched UPDATE statements; set 0 to keep server/session default.
+    CLICKHOUSE_MAX_QUERY_SIZE = env.int("CLICKHOUSE_MAX_QUERY_SIZE", 262_144)
 
     K_DEFAULT = 100  # default return top k nearest neighbors during search
     CUSTOM_CONFIG_DIR = pathlib.Path(__file__).parent.joinpath("custom/custom_case.json")

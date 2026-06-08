@@ -175,13 +175,16 @@ class Milvus(VectorDB):
         from pymilvus import connections
 
         self.col: Collection | None = None
-
         connections.connect(**self.db_config, timeout=60)
-        # Grab the existing colection with connections
+        # Grab the existing collection with connections
         self.col = Collection(self.collection_name)
-
-        yield
-        connections.disconnect("default")
+        try:
+            yield
+        finally:
+            # Important: clear non-picklable pymilvus handles before multiprocessing
+            # concurrent search pickles the runner/db object under spawn context.
+            self.col = None
+            connections.disconnect("default")
 
     def _optimize(self):
         log.info(f"{self.name} optimizing before search")

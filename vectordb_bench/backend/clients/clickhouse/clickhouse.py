@@ -35,6 +35,15 @@ def _clickhouse_thread_cap_settings(
         out["local_filesystem_read_method"] = fs_read_method
     if bool((db_config or {}).get("query_plan_optimize_lazy_materialization", False)):
         out["query_plan_optimize_lazy_materialization"] = 1
+    max_query_size = int(
+        (db_config or {}).get(
+            "max_query_size",
+            getattr(config, "CLICKHOUSE_MAX_QUERY_SIZE", 0),
+        )
+        or 0
+    )
+    if max_query_size > 0:
+        out["max_query_size"] = max_query_size
     if enable_flamegraph:
         real_time_period_ns = int(
             (db_config or {}).get(

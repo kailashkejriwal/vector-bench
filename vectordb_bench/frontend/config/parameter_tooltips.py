@@ -239,6 +239,7 @@ DB_CONFIG_TOOLTIPS: dict[str, str] = {
     "local_filesystem_read_method": "ClickHouse only (`local_filesystem_read_method`): filesystem read strategy for local disks. Try `pread` to reduce contention on mixed/random IO workloads.",
     "clickhouse_server_version": "ClickHouse auto-provision only (`clickhouse/clickhouse-server:<tag>`): Docker image version/tag. Default uses LTS; set e.g. `26.5` to test a newer release.",
     "query_plan_optimize_lazy_materialization": "ClickHouse only (`query_plan_optimize_lazy_materialization`): when enabled, applies `SET query_plan_optimize_lazy_materialization = 1` for benchmark queries.",
+    "max_query_size": "ClickHouse only (`max_query_size`): maximum SQL text size per query. UI input is in KB and converted to bytes for the benchmark session. Increase when using batched update queries with large vectors.",
 }
 
 # DB config keys grouped for section headers (order preserved)
@@ -251,6 +252,7 @@ DB_CONFIG_GROUP_ORDER: list[tuple[str, list[str]]] = [
     ("Performance cache", ["vector_similarity_index_cache_size"]),
     ("Storage IO tuning", ["mark_cache_size", "local_filesystem_read_method"]),
     ("Query planner", ["query_plan_optimize_lazy_materialization"]),
+    ("Query limits", ["max_query_size"]),
     ("Provisioning", ["clickhouse_server_version"]),
     ("Result labeling", ["db_label", "version", "note"]),
     ("Instance resources (GB)", ["cpu", "memory"]),

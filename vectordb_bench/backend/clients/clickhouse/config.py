@@ -21,6 +21,7 @@ class ClickhouseConfigDict(TypedDict):
     local_filesystem_read_method: str
     clickhouse_server_version: str
     query_plan_optimize_lazy_materialization: bool
+    max_query_size: int
 
 
 class ClickhouseConfig(DBConfig):
@@ -43,6 +44,8 @@ class ClickhouseConfig(DBConfig):
     clickhouse_server_version: str = "25.8"
     # Session-level planner optimization toggle.
     query_plan_optimize_lazy_materialization: bool = False
+    # Session-level SQL text size limit in bytes (0 = server default).
+    max_query_size: int = 262_144
 
     def to_dict(self) -> ClickhouseConfigDict:
         pwd_str = self.password.get_secret_value()
@@ -61,6 +64,7 @@ class ClickhouseConfig(DBConfig):
             "local_filesystem_read_method": self.local_filesystem_read_method,
             "clickhouse_server_version": self.clickhouse_server_version,
             "query_plan_optimize_lazy_materialization": self.query_plan_optimize_lazy_materialization,
+            "max_query_size": self.max_query_size,
         }
 
 
