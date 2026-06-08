@@ -227,10 +227,14 @@ class CaseRunner(BaseModel):
                     m.write_qps = 0.0
                     m.write_throughput = 0.0
             if TaskStage.UPDATE in self.config.stages:
-                updated_count, update_dur, update_p99 = self._run_updates()
+                updated_count, update_dur, update_p99, update_resource_metrics = self._run_updates()
                 m.update_qps = updated_count / update_dur if update_dur > 0 else 0.0
                 m.update_throughput = m.update_qps
                 m.update_latency_p99 = update_p99
+                m.update_avg_cpu_usage = update_resource_metrics.get("avg_cpu_usage", 0.0)
+                m.update_peak_cpu_usage = update_resource_metrics.get("peak_cpu_usage", 0.0)
+                m.update_avg_memory_usage = update_resource_metrics.get("avg_memory_usage", 0.0)
+                m.update_peak_memory_usage = update_resource_metrics.get("peak_memory_usage", 0.0)
                 log.info(
                     "Update stage finished: updated=%s, duration=%s, p99=%s",
                     updated_count,
@@ -272,16 +276,16 @@ class CaseRunner(BaseModel):
             m.disk_write_bytes = resource_metrics.get('disk_write_bytes', 0)
             apply_disk_usage_sample(m, self.config.db, phase="end")
 
-    def _run_updates(self) -> tuple[int, float, float]:
+    def _run_updates(self) -> tuple[int, float, float, dict]:
         ratio = float(getattr(self.config.db_case_config, "update_ratio", 0.001) or 0.001)
         ratio = max(0.0, min(ratio, 1.0))
         if ratio <= 0:
-            return 0, 0.0, 0.0
+            return 0, 0.0, 0.0, {}
 
         batch_size = int(getattr(self.config.db_case_config, "update_batch_size", 100) or 100)
         ids, vectors, labels = self._build_update_payload(ratio)
         if not ids:
-            return 0, 0.0, 0.0
+            return 0, 0.0, 0.0, {}
 
         self.update_runner = SerialUpdateRunner(
             db=self.db,
@@ -290,17 +294,26 @@ class CaseRunner(BaseModel):
             batch_size=batch_size,
             labels_data=labels,
         )
+        stage_monitor = utils.ResourceMonitor()
+        stage_monitor.start_monitoring()
+        update_resource_metrics = {}
         try:
             (updated_count, duration, p99), _ = self.update_runner.run()
-            return updated_count, duration, p99
+            update_resource_metrics = stage_monitor.stop_monitoring()
+            return updated_count, duration, p99, update_resource_metrics
         except NotImplementedError:
             log.info("DB %s does not implement update stage; skipping", self.config.db)
-            return 0, 0.0, 0.0
+            update_resource_metrics = stage_monitor.stop_monitoring()
+            return 0, 0.0, 0.0, update_resource_metrics
         except RuntimeError as e:
             if "does not support update benchmarking" in str(e):
                 log.info("DB %s does not implement update stage; skipping", self.config.db)
-                return 0, 0.0, 0.0
+                update_resource_metrics = stage_monitor.stop_monitoring()
+                return 0, 0.0, 0.0, update_resource_metrics
             raise
+        finally:
+            if stage_monitor.monitoring:
+                stage_monitor.stop_monitoring()
 
     def _build_update_payload(self, ratio: float) -> tuple[list[int], list[list[float]], list[str] | None]:
         target = max(1, int(self.ca.dataset.data.size * ratio))

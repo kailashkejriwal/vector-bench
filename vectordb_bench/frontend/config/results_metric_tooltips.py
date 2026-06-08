@@ -28,6 +28,10 @@ from vectordb_bench.metric import (
     SERIAL_LATENCY_P99_METRIC,
     SERIAL_LATENCY_P95_METRIC,
     UPDATE_LATENCY_P99_METRIC,
+    UPDATE_AVG_CPU_USAGE_METRIC,
+    UPDATE_PEAK_CPU_USAGE_METRIC,
+    UPDATE_AVG_MEMORY_USAGE_METRIC,
+    UPDATE_PEAK_MEMORY_USAGE_METRIC,
     UPDATE_QPS_METRIC,
     UPDATE_THROUGHPUT_METRIC,
     WRITE_LATENCY_P99_METRIC,
@@ -111,6 +115,22 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
     UPDATE_QPS_METRIC: (
         "Update QPS: Update/upsert throughput (ops/s). Higher is better when applicable."
     ),
+    UPDATE_AVG_CPU_USAGE_METRIC: (
+        "Update average CPU usage: Mean CPU utilization (%) during the update stage only. "
+        "Lower is better for update efficiency."
+    ),
+    UPDATE_PEAK_CPU_USAGE_METRIC: (
+        "Update peak CPU usage: Maximum CPU utilization (%) during the update stage only. "
+        "Lower is better."
+    ),
+    UPDATE_AVG_MEMORY_USAGE_METRIC: (
+        "Update average memory usage: Mean RAM used during the update stage (MB). "
+        "Lower is better."
+    ),
+    UPDATE_PEAK_MEMORY_USAGE_METRIC: (
+        "Update peak memory usage: Maximum RAM used during the update stage (MB). "
+        "Lower is better."
+    ),
     READ_LATENCY_P99_METRIC: (
         "Read latency (p99): 99th percentile search latency in ms. Lower is better."
     ),
@@ -190,6 +210,10 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
             UPDATE_QPS_METRIC,
             UPDATE_LATENCY_P99_METRIC,
             UPDATE_THROUGHPUT_METRIC,
+            UPDATE_AVG_CPU_USAGE_METRIC,
+            UPDATE_PEAK_CPU_USAGE_METRIC,
+            UPDATE_AVG_MEMORY_USAGE_METRIC,
+            UPDATE_PEAK_MEMORY_USAGE_METRIC,
             QURIES_PER_DOLLAR_METRIC,
         ],
     ),

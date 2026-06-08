@@ -75,6 +75,10 @@ class Metric:
     read_throughput: float = 0.0  # Read throughput (queries/sec)
     write_throughput: float = 0.0  # Write throughput (inserts/sec)
     update_throughput: float = 0.0  # Update throughput (updates/sec)
+    update_avg_cpu_usage: float = 0.0  # Average CPU usage during update stage (%)
+    update_peak_cpu_usage: float = 0.0  # Peak CPU usage during update stage (%)
+    update_avg_memory_usage: float = 0.0  # Average memory usage during update stage (MB)
+    update_peak_memory_usage: float = 0.0  # Peak memory usage during update stage (MB)
 
 
 QURIES_PER_DOLLAR_METRIC = "QP$ (Quries per Dollar)"
@@ -97,6 +101,10 @@ BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC = "bench_db_host_data_dir_bytes_writ
 READ_QPS_METRIC = "read_qps"
 WRITE_QPS_METRIC = "write_qps"
 UPDATE_QPS_METRIC = "update_qps"
+UPDATE_AVG_CPU_USAGE_METRIC = "update_avg_cpu_usage"
+UPDATE_PEAK_CPU_USAGE_METRIC = "update_peak_cpu_usage"
+UPDATE_AVG_MEMORY_USAGE_METRIC = "update_avg_memory_usage"
+UPDATE_PEAK_MEMORY_USAGE_METRIC = "update_peak_memory_usage"
 READ_LATENCY_P99_METRIC = "read_latency_p99"
 WRITE_LATENCY_P99_METRIC = "write_latency_p99"
 UPDATE_LATENCY_P99_METRIC = "update_latency_p99"
@@ -143,6 +151,10 @@ metric_unit_map = {
     READ_QPS_METRIC: "qps",
     WRITE_QPS_METRIC: "qps",
     UPDATE_QPS_METRIC: "qps",
+    UPDATE_AVG_CPU_USAGE_METRIC: "%",
+    UPDATE_PEAK_CPU_USAGE_METRIC: "%",
+    UPDATE_AVG_MEMORY_USAGE_METRIC: "MB",
+    UPDATE_PEAK_MEMORY_USAGE_METRIC: "MB",
     READ_LATENCY_P99_METRIC: "ms",
     WRITE_LATENCY_P99_METRIC: "ms",
     UPDATE_LATENCY_P99_METRIC: "ms",
@@ -172,6 +184,10 @@ lower_is_better_metrics = [
     READ_LATENCY_P99_METRIC,
     WRITE_LATENCY_P99_METRIC,
     UPDATE_LATENCY_P99_METRIC,
+    UPDATE_AVG_CPU_USAGE_METRIC,
+    UPDATE_PEAK_CPU_USAGE_METRIC,
+    UPDATE_AVG_MEMORY_USAGE_METRIC,
+    UPDATE_PEAK_MEMORY_USAGE_METRIC,
     INSERT_DURATION_METRIC,
     OPTIMIZE_DURATION_METRIC,
 ]
@@ -196,6 +212,10 @@ metric_order = [
     READ_QPS_METRIC,
     WRITE_QPS_METRIC,
     UPDATE_QPS_METRIC,
+    UPDATE_AVG_CPU_USAGE_METRIC,
+    UPDATE_PEAK_CPU_USAGE_METRIC,
+    UPDATE_AVG_MEMORY_USAGE_METRIC,
+    UPDATE_PEAK_MEMORY_USAGE_METRIC,
     READ_LATENCY_P99_METRIC,
     WRITE_LATENCY_P99_METRIC,
     UPDATE_LATENCY_P99_METRIC,

@@ -911,10 +911,16 @@ CaseConfigParamInput_EnableUpdateStage = CaseConfigParamInput_EnableUpdateStage_
     update={"displayLabel": "Enable update stage"}
 )
 CaseConfigParamInput_UpdateRatio = CaseConfigParamInput_UpdateRatio_Clickhouse.copy(
-    update={"displayLabel": "Update ratio"}
+    update={
+        "displayLabel": "Update ratio",
+        "isDisplayed": lambda config: True,
+    }
 )
 CaseConfigParamInput_UpdateBatchSize = CaseConfigParamInput_UpdateBatchSize_Clickhouse.copy(
-    update={"displayLabel": "Update batch size"}
+    update={
+        "displayLabel": "Update batch size",
+        "isDisplayed": lambda config: True,
+    }
 )
 
 CaseConfigParamInput_SQType = CaseConfigInput(
