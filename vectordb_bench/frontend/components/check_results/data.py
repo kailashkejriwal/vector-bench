@@ -20,6 +20,16 @@ TUNING_DISPLAY_KEYS = {
     "metric_type", "vector_data_type", "num_candidates", "search_list",
     "m", "num_leaves", "num_leaves_to_search", "quantizer", "reranking",
     "enable_update_stage", "update_ratio", "update_batch_size", "update_query_mode",
+    # Qdrant (self-hosted) full config
+    "ef_construct", "full_scan_threshold", "max_indexing_threads", "hnsw_on_disk",
+    "payload_m", "on_disk", "vector_datatype", "deleted_threshold",
+    "vacuum_min_vector_number", "default_segment_number", "max_segment_size",
+    "memmap_threshold", "indexing_threshold", "flush_interval_sec",
+    "max_optimization_threads", "wal_capacity_mb", "wal_segments_ahead",
+    "shard_number", "replication_factor", "write_consistency_factor",
+    "on_disk_payload", "quantization_mode", "sq_quantile", "sq_always_ram",
+    "pq_compression", "pq_always_ram", "bq_always_ram", "hnsw_ef", "exact",
+    "indexed_only", "quant_rescore", "quant_oversampling", "quant_ignore",
 }
 
 

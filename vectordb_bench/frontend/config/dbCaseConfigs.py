@@ -2387,52 +2387,312 @@ WeaviatePerformanceConfig = [
     CaseConfigParamInput_dynamicEfMax_Weaviate,
 ]
 
+# --- Qdrant (self-hosted) HNSW index config ---
 CaseConfigParamInput_m_QdrantLocal = CaseConfigInput(
     label=CaseConfigParamType.m,
     displayLabel="m",
-    inputHelp="HNSW graph degree (m) for Qdrant",
+    inputHelp="HNSW graph degree: bidirectional links per node. Qdrant default 16.",
     inputType=InputType.Number,
-    inputConfig={
-        "min": 4,
-        "max": 64,
-        "value": 16,
-    },
+    inputConfig={"min": 4, "max": 128, "value": 16},
 )
-
 CaseConfigParamInput_ef_construct_QdrantLocal = CaseConfigInput(
     label=CaseConfigParamType.ef_construct,
     displayLabel="ef_construct",
-    inputHelp="HNSW ef_construct (construction time) for Qdrant",
+    inputHelp="Size of the dynamic candidate list during index construction. Qdrant default 100.",
     inputType=InputType.Number,
-    inputConfig={
-        "min": 8,
-        "max": 512,
-        "value": 200,
-    },
+    inputConfig={"min": 4, "max": 4096, "value": 100},
 )
+CaseConfigParamInput_full_scan_threshold_QdrantLocal = CaseConfigInput(
+    label=_opt_param("full_scan_threshold"),
+    displayLabel="full_scan_threshold (KB)",
+    inputHelp="Minimal collection size (KB) for which the HNSW index is used; below it Qdrant does full scan. Qdrant default 10000.",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 10_000_000, "value": 10000},
+)
+CaseConfigParamInput_max_indexing_threads_QdrantLocal = CaseConfigInput(
+    label=_opt_param("max_indexing_threads"),
+    displayLabel="max_indexing_threads",
+    inputHelp="Max threads used to build the HNSW index. 0 = auto (use all cores). Qdrant default 0.",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 128, "value": 0},
+)
+CaseConfigParamInput_hnsw_on_disk_QdrantLocal = CaseConfigInput(
+    label=_opt_param("hnsw_on_disk"),
+    displayLabel="HNSW index on disk",
+    inputHelp="Store the HNSW graph on disk instead of RAM. Reduces memory, may increase latency. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+)
+CaseConfigParamInput_payload_m_QdrantLocal = CaseConfigInput(
+    label=_opt_param("payload_m"),
+    displayLabel="payload_m",
+    inputHelp="Number of additional HNSW links per node built per payload group (for payload/tenant indexing). 0 = disabled (Qdrant default).",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 128, "value": 0},
+)
+
+# --- Qdrant vector storage ---
+CaseConfigParamInput_on_disk_QdrantLocal = CaseConfigInput(
+    label=_opt_param("on_disk"),
+    displayLabel="Vectors on disk",
+    inputHelp="Store raw vectors on disk (memmap). Reduces RAM use, may increase latency. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+)
+CaseConfigParamInput_vector_datatype_QdrantLocal = CaseConfigInput(
+    label=_opt_param("vector_datatype"),
+    displayLabel="Vector datatype",
+    inputHelp="Stored vector element type. float32 = full precision (default); float16/uint8 = smaller, faster, lower precision.",
+    inputType=InputType.Option,
+    inputConfig={"options": ["float32", "uint8", "float16"]},
+)
+
+# --- Qdrant optimizers ---
+CaseConfigParamInput_deleted_threshold_QdrantLocal = CaseConfigInput(
+    label=_opt_param("deleted_threshold"),
+    displayLabel="deleted_threshold",
+    inputHelp="Fraction of deleted vectors in a segment before it is optimized/vacuumed. Qdrant default 0.2.",
+    inputType=InputType.Float,
+    inputConfig={"min": 0.0, "max": 1.0, "value": 0.2, "step": 0.05},
+)
+CaseConfigParamInput_vacuum_min_vector_number_QdrantLocal = CaseConfigInput(
+    label=_opt_param("vacuum_min_vector_number"),
+    displayLabel="vacuum_min_vector_number",
+    inputHelp="Minimum vectors in a segment before vacuum optimization runs. Qdrant default 1000.",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 10_000_000, "value": 1000},
+)
+CaseConfigParamInput_default_segment_number_QdrantLocal = CaseConfigInput(
+    label=_opt_param("default_segment_number"),
+    displayLabel="default_segment_number",
+    inputHelp="Target number of segments per shard. 0 = auto (number of CPUs). Qdrant default 0.",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 1024, "value": 0},
+)
+CaseConfigParamInput_max_segment_size_QdrantLocal = CaseConfigInput(
+    label=_opt_param("max_segment_size"),
+    displayLabel="max_segment_size (KB)",
+    inputHelp="Max segment size in KB before splitting. 0 = unset (Qdrant default, unbounded).",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 1_000_000_000, "value": 0},
+)
+CaseConfigParamInput_memmap_threshold_QdrantLocal = CaseConfigInput(
+    label=_opt_param("memmap_threshold"),
+    displayLabel="memmap_threshold (KB)",
+    inputHelp="Segment size (KB) above which vectors are stored using memmap. 0 = unset (Qdrant default).",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 1_000_000_000, "value": 0},
+)
+CaseConfigParamInput_indexing_threshold_QdrantLocal = CaseConfigInput(
+    label=_opt_param("indexing_threshold"),
+    displayLabel="indexing_threshold (KB)",
+    inputHelp="Minimum segment size (KB) before the HNSW index is built. Qdrant default 20000. (Indexing is disabled during bulk load and re-enabled at this value.)",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 1_000_000_000, "value": 20000},
+)
+CaseConfigParamInput_flush_interval_sec_QdrantLocal = CaseConfigInput(
+    label=_opt_param("flush_interval_sec"),
+    displayLabel="flush_interval_sec",
+    inputHelp="Interval (seconds) between forced flushes to disk. Qdrant default 5.",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 3600, "value": 5},
+)
+CaseConfigParamInput_max_optimization_threads_QdrantLocal = CaseConfigInput(
+    label=_opt_param("max_optimization_threads"),
+    displayLabel="max_optimization_threads",
+    inputHelp="Max threads for optimization. 0 = unset (Qdrant default, auto).",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 128, "value": 0},
+)
+
+# --- Qdrant write-ahead log ---
+CaseConfigParamInput_wal_capacity_mb_QdrantLocal = CaseConfigInput(
+    label=_opt_param("wal_capacity_mb"),
+    displayLabel="wal_capacity_mb",
+    inputHelp="Size of a single WAL segment in MB. Qdrant default 32.",
+    inputType=InputType.Number,
+    inputConfig={"min": 1, "max": 10_000, "value": 32},
+)
+CaseConfigParamInput_wal_segments_ahead_QdrantLocal = CaseConfigInput(
+    label=_opt_param("wal_segments_ahead"),
+    displayLabel="wal_segments_ahead",
+    inputHelp="Number of WAL segments to create ahead of time. Qdrant default 0.",
+    inputType=InputType.Number,
+    inputConfig={"min": 0, "max": 1000, "value": 0},
+)
+
+# --- Qdrant collection level ---
+CaseConfigParamInput_shard_number_QdrantLocal = CaseConfigInput(
+    label=_opt_param("shard_number"),
+    displayLabel="shard_number",
+    inputHelp="Number of shards for the collection. Qdrant default 1.",
+    inputType=InputType.Number,
+    inputConfig={"min": 1, "max": 1000, "value": 1},
+)
+CaseConfigParamInput_replication_factor_QdrantLocal = CaseConfigInput(
+    label=_opt_param("replication_factor"),
+    displayLabel="replication_factor",
+    inputHelp="Number of replicas per shard (distributed mode). Qdrant default 1.",
+    inputType=InputType.Number,
+    inputConfig={"min": 1, "max": 100, "value": 1},
+)
+CaseConfigParamInput_write_consistency_factor_QdrantLocal = CaseConfigInput(
+    label=_opt_param("write_consistency_factor"),
+    displayLabel="write_consistency_factor",
+    inputHelp="Number of replicas that must confirm a write. Qdrant default 1.",
+    inputType=InputType.Number,
+    inputConfig={"min": 1, "max": 100, "value": 1},
+)
+CaseConfigParamInput_on_disk_payload_QdrantLocal = CaseConfigInput(
+    label=_opt_param("on_disk_payload"),
+    displayLabel="Payload on disk",
+    inputHelp="Store payload on disk instead of RAM (only IDs/index kept in RAM). Qdrant default true.",
+    inputType=InputType.Bool,
+    inputConfig={"value": True},
+)
+
+# --- Qdrant quantization ---
+CaseConfigParamInput_quantization_mode_QdrantLocal = CaseConfigInput(
+    label=_opt_param("quantization_mode"),
+    displayLabel="Quantization",
+    inputHelp="Vector quantization mode. none = disabled (default); scalar = int8; product = PQ; binary = 1-bit.",
+    inputType=InputType.Option,
+    inputConfig={"options": ["none", "scalar", "product", "binary"]},
+)
+CaseConfigParamInput_sq_quantile_QdrantLocal = CaseConfigInput(
+    label=_opt_param("sq_quantile"),
+    displayLabel="Scalar quantile",
+    inputHelp="Quantile used to clip extreme values for scalar (int8) quantization. Qdrant default 0.99.",
+    inputType=InputType.Float,
+    inputConfig={"min": 0.0, "max": 1.0, "value": 0.99, "step": 0.01},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode")) == "scalar",
+)
+CaseConfigParamInput_sq_always_ram_QdrantLocal = CaseConfigInput(
+    label=_opt_param("sq_always_ram"),
+    displayLabel="Scalar quant always in RAM",
+    inputHelp="Keep quantized vectors in RAM. Improves speed, uses more memory. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode")) == "scalar",
+)
+CaseConfigParamInput_pq_compression_QdrantLocal = CaseConfigInput(
+    label=_opt_param("pq_compression"),
+    displayLabel="PQ compression",
+    inputHelp="Product quantization compression ratio vs original vectors. Higher = smaller, lower recall.",
+    inputType=InputType.Option,
+    inputConfig={"options": ["x16", "x4", "x8", "x32", "x64"]},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode")) == "product",
+)
+CaseConfigParamInput_pq_always_ram_QdrantLocal = CaseConfigInput(
+    label=_opt_param("pq_always_ram"),
+    displayLabel="PQ always in RAM",
+    inputHelp="Keep product-quantized vectors in RAM. Improves speed, uses more memory. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode")) == "product",
+)
+CaseConfigParamInput_bq_always_ram_QdrantLocal = CaseConfigInput(
+    label=_opt_param("bq_always_ram"),
+    displayLabel="Binary quant always in RAM",
+    inputHelp="Keep binary-quantized vectors in RAM. Improves speed, uses more memory. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode")) == "binary",
+)
+
+# --- Qdrant search params ---
 CaseConfigParamInput_hnsw_ef_QdrantLocal = CaseConfigInput(
     label=_opt_param("hnsw_ef"),
     displayLabel="hnsw_ef (search)",
-    inputHelp="Search-time HNSW ef. Higher = better recall, higher latency. 0 = use Qdrant default.",
+    inputHelp="Search-time HNSW ef (candidate list size). Higher = better recall, higher latency. 0 = use Qdrant default.",
     inputType=InputType.Number,
-    inputConfig={"min": 0, "max": 1000, "value": 100},
+    inputConfig={"min": 0, "max": 4096, "value": 0},
 )
-CaseConfigParamInput_on_disk_QdrantLocal = CaseConfigInput(
-    label=_opt_param("on_disk"),
-    displayLabel="On disk",
-    inputHelp="Store vectors and index on disk. Reduces RAM use, may increase latency.",
-    inputType=InputType.Option,
-    inputConfig={"options": [False, True]},
+CaseConfigParamInput_exact_QdrantLocal = CaseConfigInput(
+    label=_opt_param("exact"),
+    displayLabel="Exact search",
+    inputHelp="Bypass the ANN index and do exact (brute-force) search. Highest recall, slowest. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+)
+CaseConfigParamInput_indexed_only_QdrantLocal = CaseConfigInput(
+    label=_opt_param("indexed_only"),
+    displayLabel="Indexed only",
+    inputHelp="Only search already-indexed segments, skipping unindexed ones. Faster, may miss recent points. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+)
+CaseConfigParamInput_quant_rescore_QdrantLocal = CaseConfigInput(
+    label=_opt_param("quant_rescore"),
+    displayLabel="Quant rescore",
+    inputHelp="Rescore candidates with original vectors after quantized search. Improves recall, adds latency.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode"), "none") != "none",
+)
+CaseConfigParamInput_quant_oversampling_QdrantLocal = CaseConfigInput(
+    label=_opt_param("quant_oversampling"),
+    displayLabel="Quant oversampling",
+    inputHelp="Multiplier on candidates fetched from the quantized index before rescoring. Higher = better recall, more latency.",
+    inputType=InputType.Float,
+    inputConfig={"min": 1.0, "max": 10.0, "value": 1.0, "step": 0.5},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode"), "none") != "none",
+)
+CaseConfigParamInput_quant_ignore_QdrantLocal = CaseConfigInput(
+    label=_opt_param("quant_ignore"),
+    displayLabel="Ignore quantization",
+    inputHelp="Ignore quantized vectors at search time and use originals. Qdrant default false.",
+    inputType=InputType.Bool,
+    inputConfig={"value": False},
+    isDisplayed=lambda config: config.get(_opt_param("quantization_mode"), "none") != "none",
 )
 
 QdrantLocalLoadConfig = [
+    # HNSW index
     CaseConfigParamInput_m_QdrantLocal,
     CaseConfigParamInput_ef_construct_QdrantLocal,
-    CaseConfigParamInput_hnsw_ef_QdrantLocal,
+    CaseConfigParamInput_full_scan_threshold_QdrantLocal,
+    CaseConfigParamInput_max_indexing_threads_QdrantLocal,
+    CaseConfigParamInput_hnsw_on_disk_QdrantLocal,
+    CaseConfigParamInput_payload_m_QdrantLocal,
+    # Vector storage
     CaseConfigParamInput_on_disk_QdrantLocal,
+    CaseConfigParamInput_vector_datatype_QdrantLocal,
+    # Optimizers
+    CaseConfigParamInput_deleted_threshold_QdrantLocal,
+    CaseConfigParamInput_vacuum_min_vector_number_QdrantLocal,
+    CaseConfigParamInput_default_segment_number_QdrantLocal,
+    CaseConfigParamInput_max_segment_size_QdrantLocal,
+    CaseConfigParamInput_memmap_threshold_QdrantLocal,
+    CaseConfigParamInput_indexing_threshold_QdrantLocal,
+    CaseConfigParamInput_flush_interval_sec_QdrantLocal,
+    CaseConfigParamInput_max_optimization_threads_QdrantLocal,
+    # WAL
+    CaseConfigParamInput_wal_capacity_mb_QdrantLocal,
+    CaseConfigParamInput_wal_segments_ahead_QdrantLocal,
+    # Collection level
+    CaseConfigParamInput_shard_number_QdrantLocal,
+    CaseConfigParamInput_replication_factor_QdrantLocal,
+    CaseConfigParamInput_write_consistency_factor_QdrantLocal,
+    CaseConfigParamInput_on_disk_payload_QdrantLocal,
+    # Quantization
+    CaseConfigParamInput_quantization_mode_QdrantLocal,
+    CaseConfigParamInput_sq_quantile_QdrantLocal,
+    CaseConfigParamInput_sq_always_ram_QdrantLocal,
+    CaseConfigParamInput_pq_compression_QdrantLocal,
+    CaseConfigParamInput_pq_always_ram_QdrantLocal,
+    CaseConfigParamInput_bq_always_ram_QdrantLocal,
 ]
 QdrantLocalPerformanceConfig = [
     *QdrantLocalLoadConfig,
+    # Search params
+    CaseConfigParamInput_hnsw_ef_QdrantLocal,
+    CaseConfigParamInput_exact_QdrantLocal,
+    CaseConfigParamInput_indexed_only_QdrantLocal,
+    CaseConfigParamInput_quant_rescore_QdrantLocal,
+    CaseConfigParamInput_quant_oversampling_QdrantLocal,
+    CaseConfigParamInput_quant_ignore_QdrantLocal,
+    # Update stage (benchmark)
     CaseConfigParamInput_EnableUpdateStage,
     CaseConfigParamInput_UpdateRatio,
     CaseConfigParamInput_UpdateBatchSize,

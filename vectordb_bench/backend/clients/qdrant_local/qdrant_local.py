@@ -12,7 +12,6 @@ from qdrant_client.http.models import (
     CollectionStatus,
     FieldCondition,
     Filter as QdrantFilter,
-    HnswConfigDiff,
     KeywordIndexParams,
     OptimizersConfigDiff,
     PayloadSchemaType,
@@ -125,15 +124,15 @@ class QdrantLocal(VectorDB):
         del self.client
 
     def _create_collection(self, dim: int, qdrant_client: QdrantClient):
+        ip = self.case_config.index_param()
         log.info(f"Create collection: {self.collection_name}")
         log.info(
-            f"Index parameters: m={self.case_config.index_param()['m']}, "
-            f"ef_construct={self.case_config.index_param()['ef_construct']}, "
-            f"on_disk={self.case_config.index_param()['on_disk']}"
+            f"Index parameters: m={ip['m']}, ef_construct={ip['ef_construct']}, "
+            f"on_disk={ip['on_disk']}, shard_number={ip['shard_number']}, "
+            f"replication_factor={ip['replication_factor']}, "
+            f"quantization={self.case_config.quantization_mode}"
         )
 
-        # If the on_disk is true, we enable both on disk index and vectors.
-        ip = self.case_config.index_param()
         for attempt in range(1, _CREATE_COLLECTION_RETRIES + 1):
             try:
                 qdrant_client.create_collection(
@@ -142,12 +141,16 @@ class QdrantLocal(VectorDB):
                         size=dim,
                         distance=ip["distance"],
                         on_disk=ip["on_disk"],
+                        datatype=ip["datatype"],
                     ),
-                    hnsw_config=HnswConfigDiff(
-                        m=ip["m"],
-                        ef_construct=ip["ef_construct"],
-                        on_disk=ip["on_disk"],
-                    ),
+                    hnsw_config=ip["hnsw_config"],
+                    optimizers_config=ip["optimizers_config"],
+                    wal_config=ip["wal_config"],
+                    quantization_config=ip["quantization_config"],
+                    shard_number=ip["shard_number"],
+                    replication_factor=ip["replication_factor"],
+                    write_consistency_factor=ip["write_consistency_factor"],
+                    on_disk_payload=ip["on_disk_payload"],
                 )
 
                 qdrant_client.create_payload_index(
@@ -272,10 +275,12 @@ class QdrantLocal(VectorDB):
                     points=Batch(ids=ids, payloads=payloads, vectors=vectors),
                 )
                 insert_count += len(ids)
-            # enable indexing after insertion
+            # re-enable indexing after insertion using the configured threshold
             self.client.update_collection(
                 collection_name=self.collection_name,
-                optimizer_config=OptimizersConfigDiff(indexing_threshold=100),
+                optimizer_config=OptimizersConfigDiff(
+                    indexing_threshold=self.case_config.index_param()["indexing_threshold"],
+                ),
             )
 
         except Exception as e:
