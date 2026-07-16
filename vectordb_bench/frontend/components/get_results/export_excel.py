@@ -29,6 +29,34 @@ from vectordb_bench.metric import metric_unit_map
 # Author label for Excel cell comments (shown in comment popup)
 _COMMENT_AUTHOR = "VectorDBBench"
 
+# Metrics whose stored unit is a data size. Values are auto-scaled to the most
+# readable unit per cell (e.g. 2048 MB -> "2.00 GB"). The key is the metric's
+# base unit as declared in metric_unit_map; the value is that unit's size in bytes.
+_SIZE_UNIT_BASE_BYTES = {
+    "bytes": 1,
+    "kb": 1024,
+    "mb": 1024**2,
+    "gb": 1024**3,
+}
+
+
+def _size_metric_base_bytes(metric: str) -> int | None:
+    """Return the byte-size of one unit for a size metric, or None if not a size metric."""
+    return _SIZE_UNIT_BASE_BYTES.get(str(metric_unit_map.get(metric, "")).strip().lower())
+
+
+def _human_readable_size(num_bytes: float) -> str:
+    """Format a byte count into the largest unit whose value is < 1024 (1024-based steps)."""
+    units = ["bytes", "KB", "MB", "GB", "TB", "PB"]
+    size = float(num_bytes)
+    idx = 0
+    while abs(size) >= 1024 and idx < len(units) - 1:
+        size /= 1024
+        idx += 1
+    if idx == 0:
+        return f"{int(round(size))} {units[idx]}"
+    return f"{size:.2f} {units[idx]}"
+
 # Excel sheet names must be <= 31 characters
 EXCEL_SHEET_TITLE_MAX_LEN = 31
 
@@ -349,7 +377,9 @@ def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
                     if any(_metric_value(d, metric) != "" for d in case_data):
                         unit = metric_unit_map.get(metric, "")
                         header = get_results_metric_display_name(metric)
-                        if unit:
+                        # Size metrics are auto-scaled per cell (unit embedded in each value),
+                        # so don't pin a single unit in the header.
+                        if unit and _size_metric_base_bytes(metric) is None:
                             header = f"{header} ({unit})"
                         ws.cell(row=1, column=col, value=header)
                         _style_header(ws.cell(row=1, column=col))
@@ -370,6 +400,9 @@ def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
                     for metric in metrics_in_group:
                         if any(_metric_value(x, metric) != "" for x in case_data):
                             val = _metric_value(d, metric)
+                            base_bytes = _size_metric_base_bytes(metric)
+                            if base_bytes is not None and isinstance(val, (int, float)):
+                                val = _human_readable_size(val * base_bytes)
                             ws.cell(row=r, column=c, value=val)
                             _style_cell(ws.cell(row=r, column=c))
                             c += 1
