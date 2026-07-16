@@ -58,6 +58,11 @@ class Metric:
     disk_read_bytes: int = 0  # Total disk read bytes
     disk_write_bytes: int = 0  # Total disk write bytes
 
+    # Per-component storage/RAM breakdown reported by the DB itself (JSON string).
+    # Currently Qdrant only (collection memory API / telemetry). Rendered as a
+    # dedicated sheet in the Excel export; hidden from regular metric columns.
+    db_component_usage_json: str = ""
+
     # Host DB data dir only (CLICKHOUSE_DATA_DIR / MILVUS_DATA_DIR / QDRANT_DATA_DIR / PGVECTOR_DATA_DIR).
     bench_db_host_data_dir_path: str = ""
     bench_db_host_data_dir_bytes_begin: int = 0
@@ -94,6 +99,7 @@ AVG_MEMORY_USAGE_METRIC = "avg_memory_usage"
 PEAK_MEMORY_USAGE_METRIC = "peak_memory_usage"
 DISK_READ_BYTES_METRIC = "disk_read_bytes"
 DISK_WRITE_BYTES_METRIC = "disk_write_bytes"
+DB_COMPONENT_USAGE_JSON_METRIC = "db_component_usage_json"
 BENCH_DB_HOST_DATA_DIR_PATH_METRIC = "bench_db_host_data_dir_path"
 BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC = "bench_db_host_data_dir_bytes_begin"
 BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC = "bench_db_host_data_dir_bytes_end"

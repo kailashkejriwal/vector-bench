@@ -131,7 +131,10 @@ class ContainerResourceMonitor:
     Notes:
         - CPU usage is the raw `docker stats` percentage: it is relative to a single core,
           so a container using 4 full cores reports ~400%.
-        - Memory usage is the container's current usage (RSS-like), converted to MB.
+        - Memory usage is docker stats MemUsage = cgroup memory.current - inactive_file.
+          It approximates RSS (heap/anon memory) and EXCLUDES most file-backed page cache.
+          DBs that memory-map their storage (e.g. Qdrant dense vectors, even with
+          on_disk=false) keep that data in page cache, so it does NOT show up here.
         - disk_read_bytes / disk_write_bytes are the block-IO delta over the run.
     """
 

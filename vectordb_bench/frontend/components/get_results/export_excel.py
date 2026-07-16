@@ -24,6 +24,9 @@ from vectordb_bench.frontend.config.results_metric_tooltips import (
     get_results_metric_tooltip,
     group_metrics_for_display,
 )
+from vectordb_bench.frontend.components.get_results.theoretical_estimates import (
+    compute_theoretical_breakdown,
+)
 from vectordb_bench.metric import metric_unit_map
 
 # Author label for Excel cell comments (shown in comment popup)
@@ -230,6 +233,167 @@ def _write_glossary_sheet(wb) -> None:
     ws.column_dimensions["B"].width = 90
 
 
+def _write_component_usage_sheet(wb, shown_data: list[dict]) -> None:
+    """One row per (instance, case, component): disk / RAM / cached / expected-cache usage.
+
+    Data comes from Metric.db_component_usage_json, reported by the database itself
+    (e.g. Qdrant's collection memory API). Sheet is only added when at least one
+    result carries a breakdown.
+    """
+    import json as _json
+
+    rows = []
+    for d in shown_data:
+        raw = d.get("db_component_usage_json") or ""
+        if not raw:
+            continue
+        try:
+            breakdown = _json.loads(raw)
+        except (ValueError, TypeError):
+            continue
+        instance = d.get("bar_display_name") or d.get("db_name", "")
+        case_name = d.get("case_name", "")
+        source = breakdown.get("source", "")
+        for comp in breakdown.get("components", []):
+            rows.append((instance, case_name, source, comp))
+    if not rows:
+        return
+
+    ws = wb.create_sheet(_sheet_title("Component Usage", "Component Usage"))
+    ws.cell(row=1, column=1, value=(
+        "Per-component storage and memory usage reported by the database itself after the run "
+        "(same data as the Memory tab in Qdrant's web UI). "
+        "RAM = non-evictable heap memory; Cached = file pages resident in the OS page cache (evictable); "
+        "Expected cache = data that should ideally be cached for best performance; "
+        "Disk = total file sizes on disk."
+    ))
+    ws.cell(row=1, column=1).alignment = Alignment(wrap_text=True)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=8)
+    ws.row_dimensions[1].height = 45
+
+    headers = ["Instance", "Case", "Component", "Disk", "RAM", "Cached", "Expected cache", "Source"]
+    header_row = 3
+    for c, h in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=c, value=h)
+        _style_header(cell)
+
+    def _fmt(comp: dict, key: str):
+        v = comp.get(key)
+        # Missing key = not measured (e.g. telemetry fallback); leave blank rather than 0.
+        return _human_readable_size(v) if isinstance(v, (int, float)) else ""
+
+    r = header_row + 1
+    for instance, case_name, source, comp in rows:
+        component_name = comp.get("component", "")
+        size_est = comp.get("size_bytes")
+        values = [
+            instance,
+            case_name,
+            component_name if size_est is None else f"{component_name} (size: {_human_readable_size(size_est)})",
+            _fmt(comp, "disk_bytes"),
+            _fmt(comp, "ram_bytes"),
+            _fmt(comp, "cached_bytes"),
+            _fmt(comp, "expected_cache_bytes"),
+            source,
+        ]
+        for c, v in enumerate(values, start=1):
+            cell = ws.cell(row=r, column=c, value=v)
+            _style_cell(cell)
+        r += 1
+
+    widths = [22, 26, 40, 14, 14, 14, 16, 46]
+    for c, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(c)].width = w
+
+
+def _write_theoretical_sheet(wb, shown_data: list[dict]) -> None:
+    """Best/expected/worst-case RAM and disk estimates per component, per instance x case.
+
+    Computed from dataset size/dimension and each instance's tuning parameters so readers
+    can compare theory against the measured metrics and the Component Usage sheet.
+    """
+    # One block per unique (instance, case, dataset, tuning); skip rows lacking dataset info.
+    blocks = []
+    seen = set()
+    for d in shown_data:
+        n = int(d.get("dataset_size") or 0)
+        dim = int(d.get("dataset_dim") or 0)
+        if not n or not dim:
+            continue
+        instance = d.get("bar_display_name") or d.get("db_name", "")
+        case_name = d.get("case_name", "")
+        key = (instance, case_name)
+        if key in seen:
+            continue
+        seen.add(key)
+        tuning = {k: getattr(v, "value", v) for k, v in (d.get("tuning_params") or {}).items()}
+        breakdown = compute_theoretical_breakdown(n, dim, tuning)
+        if breakdown:
+            blocks.append((instance, case_name, d.get("dataset_name", ""), breakdown))
+    if not blocks:
+        return
+
+    ws = wb.create_sheet(_sheet_title("Theoretical Estimates", "Theoretical Estimates"))
+    ws.cell(row=1, column=1, value=(
+        "Theoretical resource estimates computed from dataset size, dimension, and each instance's "
+        "configuration. Compare against measured avg/peak memory, DB data dir bytes written, and the "
+        "Component Usage sheet. Best = minimal steady-state; Expected = typical incl. overhead; "
+        "Worst = peak during indexing/optimization (use for capacity planning)."
+    ))
+    ws.cell(row=1, column=1).alignment = Alignment(wrap_text=True)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
+    ws.row_dimensions[1].height = 45
+
+    headers = [
+        "Component",
+        "RAM (best)", "RAM (expected)", "RAM (worst)",
+        "Disk (best)", "Disk (expected)", "Disk (worst)",
+        "How it's calculated",
+    ]
+    r = 3
+    for instance, case_name, dataset_name, breakdown in blocks:
+        title = f"{instance} — {case_name}" + (f" ({dataset_name})" if dataset_name else "")
+        ws.cell(row=r, column=1, value=title).font = Font(bold=True, size=12)
+        r += 1
+        for c, h in enumerate(headers, start=1):
+            _style_header(ws.cell(row=r, column=c, value=h))
+        r += 1
+        for comp in breakdown["components"]:
+            values = [
+                comp["component"],
+                *[_human_readable_size(v) if v else "—" for v in comp["ram"]],
+                *[_human_readable_size(v) if v else "—" for v in comp["disk"]],
+                comp["note"],
+            ]
+            for c, v in enumerate(values, start=1):
+                _style_cell(ws.cell(row=r, column=c, value=v))
+            ws.cell(row=r, column=8).alignment = Alignment(wrap_text=True, vertical="center")
+            r += 1
+        totals = breakdown["totals"]
+        total_values = [
+            "TOTAL",
+            *[_human_readable_size(v) for v in totals["ram"]],
+            *[_human_readable_size(v) for v in totals["disk"]],
+            "",
+        ]
+        for c, v in enumerate(total_values, start=1):
+            cell = ws.cell(row=r, column=c, value=v)
+            _style_cell(cell)
+            cell.font = Font(bold=True)
+        r += 1
+        for line in breakdown["assumptions"]:
+            cell = ws.cell(row=r, column=1, value=f"Note: {line}")
+            cell.alignment = Alignment(wrap_text=True)
+            cell.font = Font(italic=True, size=9)
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=8)
+            r += 1
+        r += 2  # blank rows between blocks
+
+    widths = [28, 14, 15, 14, 14, 15, 14, 80]
+    for c, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(c)].width = w
+
+
 def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
     """
     Build a formatted Excel workbook from the same data shown on the results page.
@@ -408,6 +572,12 @@ def build_results_excel(shown_data: list[dict], failed_tasks: dict) -> bytes:
                             c += 1
             for c in range(1, col + 1):
                 ws.column_dimensions[get_column_letter(c)].width = 20
+
+        # Per-component storage/RAM breakdown reported by the DB itself (currently Qdrant)
+        _write_component_usage_sheet(wb, shown_data)
+
+        # Theoretical best/expected/worst-case estimates for comparison against measured values
+        _write_theoretical_sheet(wb, shown_data)
 
         # Glossary sheet: insert at index 1 so it appears right after Summary
         _write_glossary_sheet(wb)

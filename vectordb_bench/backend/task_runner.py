@@ -14,6 +14,7 @@ from ..models import PerformanceTimeoutError, TaskConfig, TaskStage
 from . import utils
 from .bench_disk_usage import apply_disk_usage_sample
 from .container_monitor import make_resource_monitor
+from .db_component_usage import apply_component_usage_sample
 from .cases import Case, CaseLabel, StreamingPerformanceCase
 from .clients import DB, MetricType, api
 from .data_source import DatasetSource
@@ -276,6 +277,20 @@ class CaseRunner(BaseModel):
             m.disk_read_bytes = resource_metrics.get('disk_read_bytes', 0)
             m.disk_write_bytes = resource_metrics.get('disk_write_bytes', 0)
             apply_disk_usage_sample(m, self.config.db, phase="end")
+            self._apply_component_usage(m)
+
+    def _apply_component_usage(self, m: Metric) -> None:
+        """Ask the DB for its per-component disk/RAM breakdown (currently Qdrant only)."""
+        try:
+            collection_name = getattr(self.db, "collection_name", "") if self.db else ""
+            apply_component_usage_sample(
+                m,
+                self.config.db,
+                self.config.db_config.to_dict(),
+                collection_name,
+            )
+        except Exception as e:
+            log.warning("Per-component usage collection failed: %s", e)
 
     def _run_updates(self) -> tuple[int, float, float, dict]:
         ratio = float(getattr(self.config.db_case_config, "update_ratio", 0.001) or 0.001)
@@ -360,6 +375,7 @@ class CaseRunner(BaseModel):
             m.bench_db_host_data_dir_path = m0.bench_db_host_data_dir_path
             m.bench_db_host_data_dir_bytes_begin = m0.bench_db_host_data_dir_bytes_begin
             apply_disk_usage_sample(m, self.config.db, phase="end")
+            self._apply_component_usage(m)
         except Exception as e:
             log.warning(f"Failed to run streaming case, reason = {e}")
             traceback.print_exc()

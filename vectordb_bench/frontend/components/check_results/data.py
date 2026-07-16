@@ -118,6 +118,8 @@ def mergeTasks(tasks: list[CaseResult]):
         case = task.task_config.case_config.case
         case_name = case.name
         dataset_name = case.dataset.data.full_name
+        dataset_size = case.dataset.data.size
+        dataset_dim = case.dataset.data.dim
         filter_rate = case.filter_rate
         task_metrics = asdict(task.metrics)
         existing = dbCaseMetricsMap[merge_key][case_name]
@@ -134,6 +136,8 @@ def mergeTasks(tasks: list[CaseResult]):
             "db_label": db_label,
             "version": version,
             "dataset_name": dataset_name,
+            "dataset_size": dataset_size,
+            "dataset_dim": dataset_dim,
             "filter_rate": filter_rate,
             "metrics": new_metrics,
             "label": getBetterLabel(
@@ -153,6 +157,8 @@ def mergeTasks(tasks: list[CaseResult]):
             version = metric_info["version"]
             label = metric_info["label"]
             dataset_name = metric_info["dataset_name"]
+            dataset_size = metric_info.get("dataset_size", 0)
+            dataset_dim = metric_info.get("dataset_dim", 0)
             filter_rate = metric_info["filter_rate"]
             tuning_params = metric_info.get("tuning_params", {})
             bar_display_name = bar_display_name_from_db_name(merge_key, db)
@@ -176,6 +182,8 @@ def mergeTasks(tasks: list[CaseResult]):
                         "db": db,
                         "db_label": db_label,
                         "dataset_name": dataset_name,
+                        "dataset_size": dataset_size,
+                        "dataset_dim": dataset_dim,
                         "filter_rate": filter_rate,
                         "version": version,
                         "case_name": case_name,

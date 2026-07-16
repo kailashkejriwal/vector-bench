@@ -79,12 +79,15 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
     AVG_MEMORY_USAGE_METRIC: (
         "Average memory usage: Mean RAM used during the run (MB). "
         "Container-scoped (DB container only) when MONITOR_DB_CONTAINER_STATS is on; else whole-host used RAM. "
+        "Note: docker stats excludes OS page cache, so memory-mapped data (e.g. Qdrant vector storage) "
+        "is NOT included here — see the Component Usage sheet's Cached column for that part. "
         "Lower is better. Important for cost and avoiding OOM; index size often dominates."
     ),
     PEAK_MEMORY_USAGE_METRIC: (
         "Peak memory usage: Maximum RAM used during the run (MB). "
         "Container-scoped (DB container only) when MONITOR_DB_CONTAINER_STATS is on; else whole-host. "
-        "Lower is better. Use for capacity planning."
+        "Excludes OS page cache (memory-mapped storage), so it can be well below total data size. "
+        "Lower is better. Use for capacity planning together with the Component Usage sheet."
     ),
     DISK_READ_BYTES_METRIC: (
         "Disk read: Bytes read during the run. Container block-IO (DB container only) when "
@@ -283,9 +286,10 @@ def group_metrics_for_display(metrics_set: set[str]) -> list[tuple[str, list[str
             result.append((heading, in_group))
     # Any metric not in any group (e.g. future metrics) -> "Other"
     grouped = {m for _, lst in result for m in lst}
-    # Don't show read_qps/read_throughput as separate metrics; they duplicate QPS for search benchmarks
-    _redundant_read_metrics = {"read_qps", "read_throughput"}
-    other = [m for m in sorted(metrics_set) if m not in grouped and m not in _redundant_read_metrics]
+    # Don't show read_qps/read_throughput as separate metrics; they duplicate QPS for search benchmarks.
+    # db_component_usage_json is a raw JSON blob rendered as its own Excel sheet, not a chart/column.
+    _hidden_metrics = {"read_qps", "read_throughput", "db_component_usage_json"}
+    other = [m for m in sorted(metrics_set) if m not in grouped and m not in _hidden_metrics]
     if other:
         result.append(("Other", other))
     return result
