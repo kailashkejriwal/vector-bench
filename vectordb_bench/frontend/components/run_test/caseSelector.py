@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+import streamlit as st_runtime
+
 from vectordb_bench.backend.clients import DB
 from vectordb_bench.frontend.components.run_test.inputWidget import inputWidget
 from vectordb_bench.frontend.config.dbCaseConfigs import (
@@ -141,7 +143,17 @@ def db_case_config_setting(st, db_to_case_cluster_configs, ui_case_item: UICaseI
     for db, instance_idx in expanded:
         key = (db, instance_idx)
         db_case_config = db_to_case_cluster_configs[key][ui_case_item]
-        configs = [c for c in get_case_config_inputs(db, ui_case_item.caseLabel) if c.isDisplayed(db_case_config)]
+        all_case_inputs = get_case_config_inputs(db, ui_case_item.caseLabel)
+        # Seed current widget selections from session_state before filtering. db_case_config
+        # is freshly created (empty) on every rerun and is only populated as widgets render
+        # below, so without this pre-seed isDisplayed() always sees an empty dict and
+        # conditionally-shown params (e.g. Qdrant scalar/PQ/binary quantization sub-options)
+        # would never appear. Widget values persist in session_state under stable keys.
+        for cfg in all_case_inputs:
+            widget_key = f"{db.name}-inst{instance_idx}-{ui_case_item.label}-{cfg.label.value}"
+            if widget_key in st_runtime.session_state:
+                db_case_config[cfg.label] = st_runtime.session_state[widget_key]
+        configs = [c for c in all_case_inputs if c.isDisplayed(db_case_config)]
         display_name = (
             f"{db.name} — Instance {instance_idx + 1}"
             if instance_count.get(db, 1) > 1
