@@ -13,6 +13,7 @@ from ..metric import Metric
 from ..models import PerformanceTimeoutError, TaskConfig, TaskStage
 from . import utils
 from .bench_disk_usage import apply_disk_usage_sample
+from .container_monitor import make_resource_monitor
 from .cases import Case, CaseLabel, StreamingPerformanceCase
 from .clients import DB, MetricType, api
 from .data_source import DatasetSource
@@ -199,7 +200,7 @@ class CaseRunner(BaseModel):
         """
 
         log.info("Start performance case")
-        monitor = utils.ResourceMonitor()
+        monitor = make_resource_monitor(self.config.db)
         monitor.start_monitoring()
         try:
             m = Metric()
@@ -294,7 +295,7 @@ class CaseRunner(BaseModel):
             batch_size=batch_size,
             labels_data=labels,
         )
-        stage_monitor = utils.ResourceMonitor()
+        stage_monitor = make_resource_monitor(self.config.db)
         stage_monitor.start_monitoring()
         update_resource_metrics = {}
         try:

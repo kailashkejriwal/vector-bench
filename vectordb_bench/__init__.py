@@ -88,6 +88,11 @@ class config:
     QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
     # REST API timeout for qdrant-client (seconds). Library default is 5s; create_collection can exceed that on slow disks.
     QDRANT_CLIENT_TIMEOUT_SEC = env.int("QDRANT_CLIENT_TIMEOUT_SEC", 120)
+    # Scope resource metrics (CPU/memory/disk IO) to the DB's own Docker container instead of the whole host/VM.
+    # When on, VectorDBBench samples `docker stats` for the resolved container so results reflect only the DB process.
+    MONITOR_DB_CONTAINER_STATS = env.bool("MONITOR_DB_CONTAINER_STATS", True)
+    # Explicit Qdrant container name or id to monitor. Empty = auto-detect the running `qdrant/qdrant` container.
+    QDRANT_CONTAINER = env.str("QDRANT_CONTAINER", "")
     # PgVector (Docker): host path mounted to Postgres PGDATA for persistence / large disk (e.g. NVMe).
     PGVECTOR_DATA_DIR = env.str("PGVECTOR_DATA_DIR", "")
     # Image for auto-provisioned PgVector. Docker Hub often has no :latest; pin a pgNN tag.

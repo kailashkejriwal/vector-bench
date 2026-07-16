@@ -67,26 +67,33 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
     ),
     AVG_CPU_USAGE_METRIC: (
         "Average CPU usage: Mean CPU utilization (%) during the benchmark run. "
-        "Lower is better for resource efficiency; high usage can indicate compute-bound workload."
+        "When container-scoped monitoring is on (MONITOR_DB_CONTAINER_STATS), this is the DB container only "
+        "(via docker stats), where 100% = one full core, so it can exceed 100% on multi-core; "
+        "otherwise it is whole-host CPU (0-100%). Lower is better for resource efficiency."
     ),
     PEAK_CPU_USAGE_METRIC: (
         "Peak CPU usage: Maximum CPU utilization (%) during the run. "
-        "Lower is better. Helps size instances and avoid throttling."
+        "Container-scoped when MONITOR_DB_CONTAINER_STATS is on (docker stats, can exceed 100% on multi-core); "
+        "else whole-host. Lower is better. Helps size instances and avoid throttling."
     ),
     AVG_MEMORY_USAGE_METRIC: (
         "Average memory usage: Mean RAM used during the run (MB). "
+        "Container-scoped (DB container only) when MONITOR_DB_CONTAINER_STATS is on; else whole-host used RAM. "
         "Lower is better. Important for cost and avoiding OOM; index size often dominates."
     ),
     PEAK_MEMORY_USAGE_METRIC: (
         "Peak memory usage: Maximum RAM used during the run (MB). "
+        "Container-scoped (DB container only) when MONITOR_DB_CONTAINER_STATS is on; else whole-host. "
         "Lower is better. Use for capacity planning."
     ),
     DISK_READ_BYTES_METRIC: (
-        "Disk read: Total bytes read from disk during the run. "
+        "Disk read: Bytes read during the run. Container block-IO (DB container only) when "
+        "MONITOR_DB_CONTAINER_STATS is on; else whole-host disk read. "
         "Lower is better for I/O efficiency; high values may indicate disk-based indexes or cold caches."
     ),
     DISK_WRITE_BYTES_METRIC: (
-        "Disk write: Total bytes written to disk during the run. "
+        "Disk write: Bytes written during the run. Container block-IO (DB container only) when "
+        "MONITOR_DB_CONTAINER_STATS is on; else whole-host disk write. "
         "Lower is better; reflects index build and compaction I/O."
     ),
     BENCH_DB_HOST_DATA_DIR_PATH_METRIC: (
