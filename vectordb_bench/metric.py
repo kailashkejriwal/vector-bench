@@ -53,8 +53,13 @@ class Metric:
     # New: Resource usage metrics
     avg_cpu_usage: float = 0.0  # Average CPU usage during run (%)
     peak_cpu_usage: float = 0.0  # Peak CPU usage (%)
-    avg_memory_usage: float = 0.0  # Average memory usage (MB)
-    peak_memory_usage: float = 0.0  # Peak memory usage (MB)
+    avg_memory_usage: float = 0.0  # Average memory usage (MB) - anon/heap only, EXCLUDES page cache
+    peak_memory_usage: float = 0.0  # Peak memory usage (MB) - anon/heap only, EXCLUDES page cache
+    # True resident memory (anon + page cache), i.e. what mmap-backed DBs like Qdrant actually
+    # hold resident. Container-scoped: raw cgroup memory.current (no inactive_file subtraction).
+    # Host-scoped fallback: total - free.
+    avg_memory_usage_total: float = 0.0  # Average total memory usage incl. page cache (MB)
+    peak_memory_usage_total: float = 0.0  # Peak total memory usage incl. page cache (MB)
     disk_read_bytes: int = 0  # Total disk read bytes
     disk_write_bytes: int = 0  # Total disk write bytes
 
@@ -82,8 +87,10 @@ class Metric:
     update_throughput: float = 0.0  # Update throughput (updates/sec)
     update_avg_cpu_usage: float = 0.0  # Average CPU usage during update stage (%)
     update_peak_cpu_usage: float = 0.0  # Peak CPU usage during update stage (%)
-    update_avg_memory_usage: float = 0.0  # Average memory usage during update stage (MB)
-    update_peak_memory_usage: float = 0.0  # Peak memory usage during update stage (MB)
+    update_avg_memory_usage: float = 0.0  # Average memory usage during update stage (MB), excludes page cache
+    update_peak_memory_usage: float = 0.0  # Peak memory usage during update stage (MB), excludes page cache
+    update_avg_memory_usage_total: float = 0.0  # Average total memory (incl. page cache) during update stage (MB)
+    update_peak_memory_usage_total: float = 0.0  # Peak total memory (incl. page cache) during update stage (MB)
 
 
 QURIES_PER_DOLLAR_METRIC = "QP$ (Quries per Dollar)"
@@ -97,6 +104,8 @@ AVG_CPU_USAGE_METRIC = "avg_cpu_usage"
 PEAK_CPU_USAGE_METRIC = "peak_cpu_usage"
 AVG_MEMORY_USAGE_METRIC = "avg_memory_usage"
 PEAK_MEMORY_USAGE_METRIC = "peak_memory_usage"
+AVG_MEMORY_USAGE_TOTAL_METRIC = "avg_memory_usage_total"
+PEAK_MEMORY_USAGE_TOTAL_METRIC = "peak_memory_usage_total"
 DISK_READ_BYTES_METRIC = "disk_read_bytes"
 DISK_WRITE_BYTES_METRIC = "disk_write_bytes"
 DB_COMPONENT_USAGE_JSON_METRIC = "db_component_usage_json"
@@ -111,6 +120,8 @@ UPDATE_AVG_CPU_USAGE_METRIC = "update_avg_cpu_usage"
 UPDATE_PEAK_CPU_USAGE_METRIC = "update_peak_cpu_usage"
 UPDATE_AVG_MEMORY_USAGE_METRIC = "update_avg_memory_usage"
 UPDATE_PEAK_MEMORY_USAGE_METRIC = "update_peak_memory_usage"
+UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC = "update_avg_memory_usage_total"
+UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC = "update_peak_memory_usage_total"
 READ_LATENCY_P99_METRIC = "read_latency_p99"
 WRITE_LATENCY_P99_METRIC = "write_latency_p99"
 UPDATE_LATENCY_P99_METRIC = "update_latency_p99"
@@ -148,6 +159,8 @@ metric_unit_map = {
     PEAK_CPU_USAGE_METRIC: "%",
     AVG_MEMORY_USAGE_METRIC: "MB",
     PEAK_MEMORY_USAGE_METRIC: "MB",
+    AVG_MEMORY_USAGE_TOTAL_METRIC: "MB",
+    PEAK_MEMORY_USAGE_TOTAL_METRIC: "MB",
     DISK_READ_BYTES_METRIC: "bytes",
     DISK_WRITE_BYTES_METRIC: "bytes",
     BENCH_DB_HOST_DATA_DIR_PATH_METRIC: "",
@@ -161,6 +174,8 @@ metric_unit_map = {
     UPDATE_PEAK_CPU_USAGE_METRIC: "%",
     UPDATE_AVG_MEMORY_USAGE_METRIC: "MB",
     UPDATE_PEAK_MEMORY_USAGE_METRIC: "MB",
+    UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC: "MB",
+    UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC: "MB",
     READ_LATENCY_P99_METRIC: "ms",
     WRITE_LATENCY_P99_METRIC: "ms",
     UPDATE_LATENCY_P99_METRIC: "ms",
@@ -185,6 +200,8 @@ lower_is_better_metrics = [
     PEAK_CPU_USAGE_METRIC,
     AVG_MEMORY_USAGE_METRIC,
     PEAK_MEMORY_USAGE_METRIC,
+    AVG_MEMORY_USAGE_TOTAL_METRIC,
+    PEAK_MEMORY_USAGE_TOTAL_METRIC,
     DISK_READ_BYTES_METRIC,
     DISK_WRITE_BYTES_METRIC,
     READ_LATENCY_P99_METRIC,
@@ -194,6 +211,8 @@ lower_is_better_metrics = [
     UPDATE_PEAK_CPU_USAGE_METRIC,
     UPDATE_AVG_MEMORY_USAGE_METRIC,
     UPDATE_PEAK_MEMORY_USAGE_METRIC,
+    UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC,
+    UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC,
     INSERT_DURATION_METRIC,
     OPTIMIZE_DURATION_METRIC,
 ]
@@ -209,6 +228,8 @@ metric_order = [
     PEAK_CPU_USAGE_METRIC,
     AVG_MEMORY_USAGE_METRIC,
     PEAK_MEMORY_USAGE_METRIC,
+    AVG_MEMORY_USAGE_TOTAL_METRIC,
+    PEAK_MEMORY_USAGE_TOTAL_METRIC,
     DISK_READ_BYTES_METRIC,
     DISK_WRITE_BYTES_METRIC,
     BENCH_DB_HOST_DATA_DIR_PATH_METRIC,
@@ -222,6 +243,8 @@ metric_order = [
     UPDATE_PEAK_CPU_USAGE_METRIC,
     UPDATE_AVG_MEMORY_USAGE_METRIC,
     UPDATE_PEAK_MEMORY_USAGE_METRIC,
+    UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC,
+    UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC,
     READ_LATENCY_P99_METRIC,
     WRITE_LATENCY_P99_METRIC,
     UPDATE_LATENCY_P99_METRIC,

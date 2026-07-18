@@ -6,6 +6,7 @@ Used by check_results/charts.py to add help text and group metrics under heading
 from vectordb_bench.metric import (
     AVG_CPU_USAGE_METRIC,
     AVG_MEMORY_USAGE_METRIC,
+    AVG_MEMORY_USAGE_TOTAL_METRIC,
     BENCH_DB_HOST_DATA_DIR_BYTES_BEGIN_METRIC,
     BENCH_DB_HOST_DATA_DIR_BYTES_END_METRIC,
     BENCH_DB_HOST_DATA_DIR_BYTES_WRITTEN_METRIC,
@@ -19,6 +20,7 @@ from vectordb_bench.metric import (
     OPTIMIZE_DURATION_METRIC,
     PEAK_CPU_USAGE_METRIC,
     PEAK_MEMORY_USAGE_METRIC,
+    PEAK_MEMORY_USAGE_TOTAL_METRIC,
     QPS_METRIC,
     QURIES_PER_DOLLAR_METRIC,
     READ_LATENCY_P99_METRIC,
@@ -32,6 +34,8 @@ from vectordb_bench.metric import (
     UPDATE_PEAK_CPU_USAGE_METRIC,
     UPDATE_AVG_MEMORY_USAGE_METRIC,
     UPDATE_PEAK_MEMORY_USAGE_METRIC,
+    UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC,
+    UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC,
     UPDATE_QPS_METRIC,
     UPDATE_THROUGHPUT_METRIC,
     WRITE_LATENCY_P99_METRIC,
@@ -77,17 +81,34 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
         "else whole-host. Lower is better. Helps size instances and avoid throttling."
     ),
     AVG_MEMORY_USAGE_METRIC: (
-        "Average memory usage: Mean RAM used during the run (MB). "
-        "Container-scoped (DB container only) when MONITOR_DB_CONTAINER_STATS is on; else whole-host used RAM. "
-        "Note: docker stats excludes OS page cache, so memory-mapped data (e.g. Qdrant vector storage) "
-        "is NOT included here — see the Component Usage sheet's Cached column for that part. "
-        "Lower is better. Important for cost and avoiding OOM; index size often dominates."
+        "Average memory usage: Mean RAM used during the run (MB), EXCLUDING OS page cache. "
+        "Container-scoped (DB container only) when MONITOR_DB_CONTAINER_STATS is on (docker stats "
+        "MemUsage = memory.current - inactive_file); else whole-host used RAM minus reclaimable cache. "
+        "Memory-mapped data (e.g. Qdrant vector storage, even with on_disk=false) is NOT included here "
+        "— see avg_memory_usage_total for the true resident figure, or the Component Usage sheet's "
+        "Cached column for a per-component breakdown. Lower is better."
     ),
     PEAK_MEMORY_USAGE_METRIC: (
-        "Peak memory usage: Maximum RAM used during the run (MB). "
+        "Peak memory usage: Maximum RAM used during the run (MB), EXCLUDING OS page cache. "
         "Container-scoped (DB container only) when MONITOR_DB_CONTAINER_STATS is on; else whole-host. "
-        "Excludes OS page cache (memory-mapped storage), so it can be well below total data size. "
-        "Lower is better. Use for capacity planning together with the Component Usage sheet."
+        "Can be well below total data size for mmap-backed DBs — see peak_memory_usage_total for the "
+        "figure that includes page cache. Lower is better."
+    ),
+    AVG_MEMORY_USAGE_TOTAL_METRIC: (
+        "Average total memory usage: Mean RAM used during the run (MB), INCLUDING OS page cache — "
+        "this is the true resident footprint. Container-scoped: raw cgroup memory.current read via "
+        "`docker exec` (no inactive_file subtraction), so mmap-backed data (e.g. Qdrant vector storage "
+        "and HNSW index) IS included. Whole-host fallback: total - free. "
+        "Falls back to the same value as avg_memory_usage if the cgroup file wasn't readable "
+        "(e.g. docker exec disabled). Lower is better; this is the number to compare against "
+        "theoretical RAM estimates and total dataset size."
+    ),
+    PEAK_MEMORY_USAGE_TOTAL_METRIC: (
+        "Peak total memory usage: Maximum RAM used during the run (MB), INCLUDING OS page cache. "
+        "Container-scoped: raw cgroup memory.current via `docker exec`; whole-host fallback: total - free. "
+        "Falls back to peak_memory_usage if the cgroup file wasn't readable. "
+        "Lower is better. Use this (not peak_memory_usage) for capacity planning and comparing against "
+        "the Theoretical Estimates sheet."
     ),
     DISK_READ_BYTES_METRIC: (
         "Disk read: Bytes read during the run. Container block-IO (DB container only) when "
@@ -134,12 +155,20 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
         "Lower is better."
     ),
     UPDATE_AVG_MEMORY_USAGE_METRIC: (
-        "Update average memory usage: Mean RAM used during the update stage (MB). "
+        "Update average memory usage: Mean RAM used during the update stage (MB), excluding page cache. "
         "Lower is better."
     ),
     UPDATE_PEAK_MEMORY_USAGE_METRIC: (
-        "Update peak memory usage: Maximum RAM used during the update stage (MB). "
+        "Update peak memory usage: Maximum RAM used during the update stage (MB), excluding page cache. "
         "Lower is better."
+    ),
+    UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC: (
+        "Update average total memory usage: Mean RAM used during the update stage (MB), including page "
+        "cache (true resident figure). Lower is better."
+    ),
+    UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC: (
+        "Update peak total memory usage: Maximum RAM used during the update stage (MB), including page "
+        "cache (true resident figure). Lower is better."
     ),
     READ_LATENCY_P99_METRIC: (
         "Read latency (p99): 99th percentile search latency in ms. Lower is better."
@@ -206,6 +235,8 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
             PEAK_CPU_USAGE_METRIC,
             AVG_MEMORY_USAGE_METRIC,
             PEAK_MEMORY_USAGE_METRIC,
+            AVG_MEMORY_USAGE_TOTAL_METRIC,
+            PEAK_MEMORY_USAGE_TOTAL_METRIC,
             DISK_READ_BYTES_METRIC,
             DISK_WRITE_BYTES_METRIC,
             BENCH_DB_HOST_DATA_DIR_PATH_METRIC,
@@ -224,6 +255,8 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
             UPDATE_PEAK_CPU_USAGE_METRIC,
             UPDATE_AVG_MEMORY_USAGE_METRIC,
             UPDATE_PEAK_MEMORY_USAGE_METRIC,
+            UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC,
+            UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC,
             QURIES_PER_DOLLAR_METRIC,
         ],
     ),
@@ -240,6 +273,10 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
 
 # Human-readable titles for chart headers (metric key -> display string)
 RESULTS_METRIC_DISPLAY_NAMES: dict[str, str] = {
+    AVG_MEMORY_USAGE_TOTAL_METRIC: "Avg memory usage (incl. cache)",
+    PEAK_MEMORY_USAGE_TOTAL_METRIC: "Peak memory usage (incl. cache)",
+    UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC: "Update avg memory usage (incl. cache)",
+    UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC: "Update peak memory usage (incl. cache)",
     INSERT_DURATION_METRIC: "Insert duration",
     OPTIMIZE_DURATION_METRIC: "Optimize duration",
     NDCG_METRIC: "NDCG",

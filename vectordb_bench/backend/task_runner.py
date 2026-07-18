@@ -237,6 +237,8 @@ class CaseRunner(BaseModel):
                 m.update_peak_cpu_usage = update_resource_metrics.get("peak_cpu_usage", 0.0)
                 m.update_avg_memory_usage = update_resource_metrics.get("avg_memory_usage", 0.0)
                 m.update_peak_memory_usage = update_resource_metrics.get("peak_memory_usage", 0.0)
+                m.update_avg_memory_usage_total = update_resource_metrics.get("avg_memory_usage_total", 0.0)
+                m.update_peak_memory_usage_total = update_resource_metrics.get("peak_memory_usage_total", 0.0)
                 log.info(
                     "Update stage finished: updated=%s, duration=%s, p99=%s",
                     updated_count,
@@ -274,6 +276,8 @@ class CaseRunner(BaseModel):
             m.peak_cpu_usage = resource_metrics.get('peak_cpu_usage', 0.0)
             m.avg_memory_usage = resource_metrics.get('avg_memory_usage', 0.0)
             m.peak_memory_usage = resource_metrics.get('peak_memory_usage', 0.0)
+            m.avg_memory_usage_total = resource_metrics.get('avg_memory_usage_total', 0.0)
+            m.peak_memory_usage_total = resource_metrics.get('peak_memory_usage_total', 0.0)
             m.disk_read_bytes = resource_metrics.get('disk_read_bytes', 0)
             m.disk_write_bytes = resource_metrics.get('disk_write_bytes', 0)
             apply_disk_usage_sample(m, self.config.db, phase="end")

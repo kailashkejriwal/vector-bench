@@ -90,7 +90,8 @@ class ResourceMonitor:
 
     def __init__(self):
         self.cpu_usages = []
-        self.memory_usages = []
+        self.memory_usages = []  # bytes, excludes reclaimable cache (psutil "used")
+        self.memory_usages_total = []  # bytes, includes cache (total - free)
         self.disk_read_bytes = 0
         self.disk_write_bytes = 0
         self.monitoring = False
@@ -104,6 +105,7 @@ class ResourceMonitor:
         self.monitoring = True
         self.cpu_usages = []
         self.memory_usages = []
+        self.memory_usages_total = []
         self.start_disk_io = psutil.disk_io_counters()
         self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.thread.start()
@@ -125,12 +127,18 @@ class ResourceMonitor:
         peak_cpu = max(self.cpu_usages) if self.cpu_usages else 0.0
         avg_mem = sum(self.memory_usages) / len(self.memory_usages) if self.memory_usages else 0.0
         peak_mem = max(self.memory_usages) if self.memory_usages else 0.0
+        avg_mem_total = (
+            sum(self.memory_usages_total) / len(self.memory_usages_total) if self.memory_usages_total else avg_mem
+        )
+        peak_mem_total = max(self.memory_usages_total) if self.memory_usages_total else peak_mem
 
         return {
             'avg_cpu_usage': avg_cpu,
             'peak_cpu_usage': peak_cpu,
-            'avg_memory_usage': avg_mem / (1024 * 1024),  # Convert to MB
-            'peak_memory_usage': peak_mem / (1024 * 1024),  # Convert to MB
+            'avg_memory_usage': avg_mem / (1024 * 1024),  # Convert to MB, excludes reclaimable cache
+            'peak_memory_usage': peak_mem / (1024 * 1024),  # Convert to MB, excludes reclaimable cache
+            'avg_memory_usage_total': avg_mem_total / (1024 * 1024),  # MB, includes cache (total - free)
+            'peak_memory_usage_total': peak_mem_total / (1024 * 1024),  # MB, includes cache (total - free)
             'disk_read_bytes': self.disk_read_bytes,
             'disk_write_bytes': self.disk_write_bytes,
         }
@@ -140,7 +148,11 @@ class ResourceMonitor:
         while self.monitoring:
             try:
                 self.cpu_usages.append(psutil.cpu_percent(interval=1.0))
-                self.memory_usages.append(psutil.virtual_memory().used)
+                vm = psutil.virtual_memory()
+                self.memory_usages.append(vm.used)
+                # `total - free` counts all non-free memory (incl. buffers/cache), unlike
+                # `.used` which on Linux already nets out most reclaimable cache.
+                self.memory_usages_total.append(vm.total - vm.free)
             except Exception:
                 # Ignore monitoring errors
                 pass

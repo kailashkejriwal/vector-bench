@@ -122,6 +122,37 @@ def _parse_pair(token: str) -> tuple[float, float]:
     return _parse_size_to_bytes(left), _parse_size_to_bytes(right)
 
 
+# Raw cgroup memory counter files, in probing order. These report memory.current /
+# usage_in_bytes with NO inactive_file subtraction, so they include page cache
+# (i.e. mmap-backed data like Qdrant vector storage) unlike `docker stats` MemUsage.
+_CGROUP_TOTAL_MEM_FILES = (
+    "/sys/fs/cgroup/memory.current",  # cgroup v2 (unified hierarchy)
+    "/sys/fs/cgroup/memory/memory.usage_in_bytes",  # cgroup v1
+)
+
+
+def _read_container_total_memory_bytes(container_id: str, known_good_file: str | None) -> tuple[float | None, str | None]:
+    """Read raw (cache-inclusive) resident memory for a container via its own cgroup file.
+
+    Uses `docker exec` so it works regardless of the host's own cgroup layout (the container
+    sees its own cgroup subtree under /sys/fs/cgroup thanks to cgroup namespacing in modern
+    Docker). Returns (bytes, file_used) on success; (None, None) if neither file is readable
+    (e.g. exec disabled, older Docker without cgroupns, or container just stopped).
+    """
+    candidates = [known_good_file] if known_good_file else list(_CGROUP_TOTAL_MEM_FILES)
+    for path in candidates:
+        if not path:
+            continue
+        out = _run_docker(["exec", container_id, "cat", path], timeout=10)
+        if out is None:
+            continue
+        try:
+            return float(out.strip().splitlines()[0]), path
+        except (ValueError, IndexError):
+            continue
+    return None, None
+
+
 class ContainerResourceMonitor:
     """Monitor CPU / memory / block-IO of a single Docker container via `docker stats`.
 
@@ -131,10 +162,15 @@ class ContainerResourceMonitor:
     Notes:
         - CPU usage is the raw `docker stats` percentage: it is relative to a single core,
           so a container using 4 full cores reports ~400%.
-        - Memory usage is docker stats MemUsage = cgroup memory.current - inactive_file.
-          It approximates RSS (heap/anon memory) and EXCLUDES most file-backed page cache.
-          DBs that memory-map their storage (e.g. Qdrant dense vectors, even with
+        - Memory usage (avg/peak_memory_usage) is docker stats MemUsage = cgroup memory.current
+          - inactive_file. It approximates RSS (heap/anon memory) and EXCLUDES most file-backed
+          page cache. DBs that memory-map their storage (e.g. Qdrant dense vectors, even with
           on_disk=false) keep that data in page cache, so it does NOT show up here.
+        - Memory usage total (avg/peak_memory_usage_total) is the raw cgroup memory.current
+          (no inactive_file subtraction), read directly from the container's own cgroup file via
+          `docker exec`. This INCLUDES page cache, so it reflects the true resident footprint of
+          mmap-backed data. Falls back to 0 (same as the excluding metric) if `docker exec`/cgroup
+          files aren't readable (e.g. exec disabled).
         - disk_read_bytes / disk_write_bytes are the block-IO delta over the run.
     """
 
@@ -144,7 +180,9 @@ class ContainerResourceMonitor:
     def __init__(self, container_id: str):
         self.container_id = container_id
         self.cpu_usages: list[float] = []
-        self.memory_usages: list[float] = []  # bytes
+        self.memory_usages: list[float] = []  # bytes, excludes page cache
+        self.memory_usages_total: list[float] = []  # bytes, includes page cache
+        self._cgroup_mem_file: str | None = None  # remembered once found, to avoid re-probing
         self._blkio_first: tuple[float, float] | None = None
         self._blkio_last: tuple[float, float] | None = None
         self.monitoring = False
@@ -171,6 +209,13 @@ class ContainerResourceMonitor:
         self.cpu_usages.append(_parse_cpu_percent(parts[0]))
         mem_used, _mem_limit = _parse_pair(parts[1])
         self.memory_usages.append(mem_used)
+
+        total_mem, found_file = _read_container_total_memory_bytes(self.container_id, self._cgroup_mem_file)
+        if found_file:
+            self._cgroup_mem_file = found_file
+        if total_mem is not None:
+            self.memory_usages_total.append(total_mem)
+
         blk = _parse_pair(parts[2])
         if self._blkio_first is None:
             self._blkio_first = blk
@@ -182,6 +227,7 @@ class ContainerResourceMonitor:
         self.monitoring = True
         self.cpu_usages = []
         self.memory_usages = []
+        self.memory_usages_total = []
         self._blkio_first = None
         self._blkio_last = None
         self.thread = threading.Thread(target=self._monitor_loop, daemon=True)
@@ -206,6 +252,12 @@ class ContainerResourceMonitor:
         peak_cpu = max(self.cpu_usages) if self.cpu_usages else 0.0
         avg_mem = sum(self.memory_usages) / len(self.memory_usages) if self.memory_usages else 0.0
         peak_mem = max(self.memory_usages) if self.memory_usages else 0.0
+        # Falls back to the anon-only figures if the cgroup file was never readable, so the
+        # "total" metric is never silently lower than the "excluding cache" one it complements.
+        avg_mem_total = (
+            sum(self.memory_usages_total) / len(self.memory_usages_total) if self.memory_usages_total else avg_mem
+        )
+        peak_mem_total = max(self.memory_usages_total) if self.memory_usages_total else peak_mem
 
         disk_read = disk_write = 0
         if self._blkio_first and self._blkio_last:
@@ -215,8 +267,10 @@ class ContainerResourceMonitor:
         return {
             "avg_cpu_usage": avg_cpu,
             "peak_cpu_usage": peak_cpu,
-            "avg_memory_usage": avg_mem / (1024 * 1024),  # MB
-            "peak_memory_usage": peak_mem / (1024 * 1024),  # MB
+            "avg_memory_usage": avg_mem / (1024 * 1024),  # MB, excludes page cache
+            "peak_memory_usage": peak_mem / (1024 * 1024),  # MB, excludes page cache
+            "avg_memory_usage_total": avg_mem_total / (1024 * 1024),  # MB, includes page cache
+            "peak_memory_usage_total": peak_mem_total / (1024 * 1024),  # MB, includes page cache
             "disk_read_bytes": disk_read,
             "disk_write_bytes": disk_write,
         }
