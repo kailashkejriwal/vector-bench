@@ -211,8 +211,19 @@ class CaseRunner(BaseModel):
             if drop_old:
                 if TaskStage.LOAD in self.config.stages:
                     # _load_train_data is @time_it; runner.run() also returns time_it from _insert_all_batches -> double wrap
-                    outer, _ = self._load_train_data()
+                    insert_monitor = make_resource_monitor(self.config.db)
+                    insert_monitor.start_monitoring()
+                    try:
+                        outer, _ = self._load_train_data()
+                    finally:
+                        insert_resource_metrics = insert_monitor.stop_monitoring()
                     (num_inserts, load_dur), _ = outer
+                    m.insert_avg_cpu_usage = insert_resource_metrics.get("avg_cpu_usage", 0.0)
+                    m.insert_peak_cpu_usage = insert_resource_metrics.get("peak_cpu_usage", 0.0)
+                    m.insert_avg_memory_usage = insert_resource_metrics.get("avg_memory_usage", 0.0)
+                    m.insert_peak_memory_usage = insert_resource_metrics.get("peak_memory_usage", 0.0)
+                    m.insert_avg_memory_usage_total = insert_resource_metrics.get("avg_memory_usage_total", 0.0)
+                    m.insert_peak_memory_usage_total = insert_resource_metrics.get("peak_memory_usage_total", 0.0)
                     build_dur = self._optimize()
                     m.insert_duration = round(load_dur, 4)
                     m.optimize_duration = round(build_dur, 4)
@@ -247,21 +258,32 @@ class CaseRunner(BaseModel):
                 )
             if TaskStage.SEARCH_SERIAL in self.config.stages or TaskStage.SEARCH_CONCURRENT in self.config.stages:
                 self._init_search_runner()
-                if TaskStage.SEARCH_CONCURRENT in self.config.stages:
-                    search_results = self._conc_search()
-                    # Only capture max QPS; concurrency breakdown is not stored
-                    m.qps = search_results[0]
-                    m.read_qps = m.qps
-                    m.read_throughput = m.qps
-                if TaskStage.SEARCH_SERIAL in self.config.stages:
-                    search_results = self._serial_search()
-                    m.recall, m.ndcg, m.serial_latency_p99, m.serial_latency_p95 = search_results
-                    # serial_latency_p99 is in seconds; only set read_qps from serial when concurrent didn't run
-                    if TaskStage.SEARCH_CONCURRENT not in self.config.stages and m.serial_latency_p99 > 0:
-                        m.read_qps = 1.0 / m.serial_latency_p99  # Approximate: 1 query per p99 second
-                    m.read_latency_p99 = m.serial_latency_p99
-                    if TaskStage.SEARCH_CONCURRENT not in self.config.stages:
-                        m.read_throughput = m.read_qps
+                read_monitor = make_resource_monitor(self.config.db)
+                read_monitor.start_monitoring()
+                try:
+                    if TaskStage.SEARCH_CONCURRENT in self.config.stages:
+                        search_results = self._conc_search()
+                        # Only capture max QPS; concurrency breakdown is not stored
+                        m.qps = search_results[0]
+                        m.read_qps = m.qps
+                        m.read_throughput = m.qps
+                    if TaskStage.SEARCH_SERIAL in self.config.stages:
+                        search_results = self._serial_search()
+                        m.recall, m.ndcg, m.serial_latency_p99, m.serial_latency_p95 = search_results
+                        # serial_latency_p99 is in seconds; only set read_qps from serial when concurrent didn't run
+                        if TaskStage.SEARCH_CONCURRENT not in self.config.stages and m.serial_latency_p99 > 0:
+                            m.read_qps = 1.0 / m.serial_latency_p99  # Approximate: 1 query per p99 second
+                        m.read_latency_p99 = m.serial_latency_p99
+                        if TaskStage.SEARCH_CONCURRENT not in self.config.stages:
+                            m.read_throughput = m.read_qps
+                finally:
+                    read_resource_metrics = read_monitor.stop_monitoring()
+                    m.read_avg_cpu_usage = read_resource_metrics.get("avg_cpu_usage", 0.0)
+                    m.read_peak_cpu_usage = read_resource_metrics.get("peak_cpu_usage", 0.0)
+                    m.read_avg_memory_usage = read_resource_metrics.get("avg_memory_usage", 0.0)
+                    m.read_peak_memory_usage = read_resource_metrics.get("peak_memory_usage", 0.0)
+                    m.read_avg_memory_usage_total = read_resource_metrics.get("avg_memory_usage_total", 0.0)
+                    m.read_peak_memory_usage_total = read_resource_metrics.get("peak_memory_usage_total", 0.0)
 
         except Exception as e:
             log.warning(f"Failed to run performance case, reason = {e}")

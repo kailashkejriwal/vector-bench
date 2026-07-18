@@ -13,7 +13,13 @@ from vectordb_bench.metric import (
     BENCH_DB_HOST_DATA_DIR_PATH_METRIC,
     DISK_READ_BYTES_METRIC,
     DISK_WRITE_BYTES_METRIC,
+    INSERT_AVG_CPU_USAGE_METRIC,
+    INSERT_AVG_MEMORY_USAGE_METRIC,
+    INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC,
     INSERT_DURATION_METRIC,
+    INSERT_PEAK_CPU_USAGE_METRIC,
+    INSERT_PEAK_MEMORY_USAGE_METRIC,
+    INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC,
     LOAD_DURATION_METRIC,
     MAX_LOAD_COUNT_METRIC,
     NDCG_METRIC,
@@ -23,7 +29,13 @@ from vectordb_bench.metric import (
     PEAK_MEMORY_USAGE_TOTAL_METRIC,
     QPS_METRIC,
     QURIES_PER_DOLLAR_METRIC,
+    READ_AVG_CPU_USAGE_METRIC,
+    READ_AVG_MEMORY_USAGE_METRIC,
+    READ_AVG_MEMORY_USAGE_TOTAL_METRIC,
     READ_LATENCY_P99_METRIC,
+    READ_PEAK_CPU_USAGE_METRIC,
+    READ_PEAK_MEMORY_USAGE_METRIC,
+    READ_PEAK_MEMORY_USAGE_TOTAL_METRIC,
     READ_QPS_METRIC,
     READ_THROUGHPUT_METRIC,
     RECALL_METRIC,
@@ -170,6 +182,53 @@ RESULTS_METRIC_TOOLTIPS: dict[str, str] = {
         "Update peak total memory usage: Maximum RAM used during the update stage (MB), including page "
         "cache (true resident figure). Lower is better."
     ),
+    INSERT_AVG_CPU_USAGE_METRIC: (
+        "Insert average CPU usage: Mean CPU utilization (%) during the insert stage only "
+        "(raw data loading, before optimize/index-build and before search). Lower is better."
+    ),
+    INSERT_PEAK_CPU_USAGE_METRIC: (
+        "Insert peak CPU usage: Maximum CPU utilization (%) during the insert stage only. Lower is better."
+    ),
+    INSERT_AVG_MEMORY_USAGE_METRIC: (
+        "Insert average memory usage: Mean RAM used during the insert stage (MB), excluding page cache. "
+        "Scoped to the raw insert phase only, not optimize/index-build or search. Lower is better."
+    ),
+    INSERT_PEAK_MEMORY_USAGE_METRIC: (
+        "Insert peak memory usage: Maximum RAM used during the insert stage (MB), excluding page cache. "
+        "Lower is better."
+    ),
+    INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC: (
+        "Insert average total memory usage: Mean RAM used during the insert stage (MB), including page "
+        "cache (true resident figure). Lower is better."
+    ),
+    INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC: (
+        "Insert peak total memory usage: Maximum RAM used during the insert stage (MB), including page "
+        "cache (true resident figure). Lower is better."
+    ),
+    READ_AVG_CPU_USAGE_METRIC: (
+        "Read average CPU usage: Mean CPU utilization (%) during the search stage only "
+        "(serial + concurrent search combined, after insert/optimize have finished). Lower is better."
+    ),
+    READ_PEAK_CPU_USAGE_METRIC: (
+        "Read peak CPU usage: Maximum CPU utilization (%) during the search stage only. Lower is better."
+    ),
+    READ_AVG_MEMORY_USAGE_METRIC: (
+        "Read average memory usage: Mean RAM used during the search stage (MB), excluding page cache. "
+        "Scoped to the search phase only, after the index is built. Lower is better."
+    ),
+    READ_PEAK_MEMORY_USAGE_METRIC: (
+        "Read peak memory usage: Maximum RAM used during the search stage (MB), excluding page cache. "
+        "Lower is better."
+    ),
+    READ_AVG_MEMORY_USAGE_TOTAL_METRIC: (
+        "Read average total memory usage: Mean RAM used during the search stage (MB), including page "
+        "cache (true resident figure) — this is what the index actually occupies while serving queries. "
+        "Lower is better."
+    ),
+    READ_PEAK_MEMORY_USAGE_TOTAL_METRIC: (
+        "Read peak total memory usage: Maximum RAM used during the search stage (MB), including page "
+        "cache (true resident figure). Lower is better."
+    ),
     READ_LATENCY_P99_METRIC: (
         "Read latency (p99): 99th percentile search latency in ms. Lower is better."
     ),
@@ -216,6 +275,12 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
             SERIAL_LATENCY_P99_METRIC,
             SERIAL_LATENCY_P95_METRIC,
             READ_LATENCY_P99_METRIC,
+            READ_AVG_CPU_USAGE_METRIC,
+            READ_PEAK_CPU_USAGE_METRIC,
+            READ_AVG_MEMORY_USAGE_METRIC,
+            READ_PEAK_MEMORY_USAGE_METRIC,
+            READ_AVG_MEMORY_USAGE_TOTAL_METRIC,
+            READ_PEAK_MEMORY_USAGE_TOTAL_METRIC,
         ],
     ),
     (
@@ -226,6 +291,12 @@ RESULTS_METRIC_GROUPS: list[tuple[str, list[str]]] = [
             WRITE_THROUGHPUT_METRIC,
             WRITE_LATENCY_P99_METRIC,
             MAX_LOAD_COUNT_METRIC,
+            INSERT_AVG_CPU_USAGE_METRIC,
+            INSERT_PEAK_CPU_USAGE_METRIC,
+            INSERT_AVG_MEMORY_USAGE_METRIC,
+            INSERT_PEAK_MEMORY_USAGE_METRIC,
+            INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC,
+            INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC,
         ],
     ),
     (
@@ -277,6 +348,18 @@ RESULTS_METRIC_DISPLAY_NAMES: dict[str, str] = {
     PEAK_MEMORY_USAGE_TOTAL_METRIC: "Peak memory usage (incl. cache)",
     UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC: "Update avg memory usage (incl. cache)",
     UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC: "Update peak memory usage (incl. cache)",
+    INSERT_AVG_CPU_USAGE_METRIC: "Insert avg CPU usage",
+    INSERT_PEAK_CPU_USAGE_METRIC: "Insert peak CPU usage",
+    INSERT_AVG_MEMORY_USAGE_METRIC: "Insert avg memory usage",
+    INSERT_PEAK_MEMORY_USAGE_METRIC: "Insert peak memory usage",
+    INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC: "Insert avg memory usage (incl. cache)",
+    INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC: "Insert peak memory usage (incl. cache)",
+    READ_AVG_CPU_USAGE_METRIC: "Read avg CPU usage",
+    READ_PEAK_CPU_USAGE_METRIC: "Read peak CPU usage",
+    READ_AVG_MEMORY_USAGE_METRIC: "Read avg memory usage",
+    READ_PEAK_MEMORY_USAGE_METRIC: "Read peak memory usage",
+    READ_AVG_MEMORY_USAGE_TOTAL_METRIC: "Read avg memory usage (incl. cache)",
+    READ_PEAK_MEMORY_USAGE_TOTAL_METRIC: "Read peak memory usage (incl. cache)",
     INSERT_DURATION_METRIC: "Insert duration",
     OPTIMIZE_DURATION_METRIC: "Optimize duration",
     NDCG_METRIC: "NDCG",

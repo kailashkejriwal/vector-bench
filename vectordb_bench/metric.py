@@ -92,6 +92,22 @@ class Metric:
     update_avg_memory_usage_total: float = 0.0  # Average total memory (incl. page cache) during update stage (MB)
     update_peak_memory_usage_total: float = 0.0  # Peak total memory (incl. page cache) during update stage (MB)
 
+    # Resource usage scoped to just the insert (load) stage, excluding optimize/index-build and search.
+    insert_avg_cpu_usage: float = 0.0
+    insert_peak_cpu_usage: float = 0.0
+    insert_avg_memory_usage: float = 0.0  # excludes page cache
+    insert_peak_memory_usage: float = 0.0  # excludes page cache
+    insert_avg_memory_usage_total: float = 0.0  # includes page cache
+    insert_peak_memory_usage_total: float = 0.0  # includes page cache
+
+    # Resource usage scoped to just the search (read) stage: serial + concurrent search combined.
+    read_avg_cpu_usage: float = 0.0
+    read_peak_cpu_usage: float = 0.0
+    read_avg_memory_usage: float = 0.0  # excludes page cache
+    read_peak_memory_usage: float = 0.0  # excludes page cache
+    read_avg_memory_usage_total: float = 0.0  # includes page cache
+    read_peak_memory_usage_total: float = 0.0  # includes page cache
+
 
 QURIES_PER_DOLLAR_METRIC = "QP$ (Quries per Dollar)"
 LOAD_DURATION_METRIC = "load_duration"
@@ -122,6 +138,18 @@ UPDATE_AVG_MEMORY_USAGE_METRIC = "update_avg_memory_usage"
 UPDATE_PEAK_MEMORY_USAGE_METRIC = "update_peak_memory_usage"
 UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC = "update_avg_memory_usage_total"
 UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC = "update_peak_memory_usage_total"
+INSERT_AVG_CPU_USAGE_METRIC = "insert_avg_cpu_usage"
+INSERT_PEAK_CPU_USAGE_METRIC = "insert_peak_cpu_usage"
+INSERT_AVG_MEMORY_USAGE_METRIC = "insert_avg_memory_usage"
+INSERT_PEAK_MEMORY_USAGE_METRIC = "insert_peak_memory_usage"
+INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC = "insert_avg_memory_usage_total"
+INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC = "insert_peak_memory_usage_total"
+READ_AVG_CPU_USAGE_METRIC = "read_avg_cpu_usage"
+READ_PEAK_CPU_USAGE_METRIC = "read_peak_cpu_usage"
+READ_AVG_MEMORY_USAGE_METRIC = "read_avg_memory_usage"
+READ_PEAK_MEMORY_USAGE_METRIC = "read_peak_memory_usage"
+READ_AVG_MEMORY_USAGE_TOTAL_METRIC = "read_avg_memory_usage_total"
+READ_PEAK_MEMORY_USAGE_TOTAL_METRIC = "read_peak_memory_usage_total"
 READ_LATENCY_P99_METRIC = "read_latency_p99"
 WRITE_LATENCY_P99_METRIC = "write_latency_p99"
 UPDATE_LATENCY_P99_METRIC = "update_latency_p99"
@@ -176,6 +204,18 @@ metric_unit_map = {
     UPDATE_PEAK_MEMORY_USAGE_METRIC: "MB",
     UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC: "MB",
     UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC: "MB",
+    INSERT_AVG_CPU_USAGE_METRIC: "%",
+    INSERT_PEAK_CPU_USAGE_METRIC: "%",
+    INSERT_AVG_MEMORY_USAGE_METRIC: "MB",
+    INSERT_PEAK_MEMORY_USAGE_METRIC: "MB",
+    INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC: "MB",
+    INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC: "MB",
+    READ_AVG_CPU_USAGE_METRIC: "%",
+    READ_PEAK_CPU_USAGE_METRIC: "%",
+    READ_AVG_MEMORY_USAGE_METRIC: "MB",
+    READ_PEAK_MEMORY_USAGE_METRIC: "MB",
+    READ_AVG_MEMORY_USAGE_TOTAL_METRIC: "MB",
+    READ_PEAK_MEMORY_USAGE_TOTAL_METRIC: "MB",
     READ_LATENCY_P99_METRIC: "ms",
     WRITE_LATENCY_P99_METRIC: "ms",
     UPDATE_LATENCY_P99_METRIC: "ms",
@@ -213,6 +253,18 @@ lower_is_better_metrics = [
     UPDATE_PEAK_MEMORY_USAGE_METRIC,
     UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC,
     UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC,
+    INSERT_AVG_CPU_USAGE_METRIC,
+    INSERT_PEAK_CPU_USAGE_METRIC,
+    INSERT_AVG_MEMORY_USAGE_METRIC,
+    INSERT_PEAK_MEMORY_USAGE_METRIC,
+    INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC,
+    INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC,
+    READ_AVG_CPU_USAGE_METRIC,
+    READ_PEAK_CPU_USAGE_METRIC,
+    READ_AVG_MEMORY_USAGE_METRIC,
+    READ_PEAK_MEMORY_USAGE_METRIC,
+    READ_AVG_MEMORY_USAGE_TOTAL_METRIC,
+    READ_PEAK_MEMORY_USAGE_TOTAL_METRIC,
     INSERT_DURATION_METRIC,
     OPTIMIZE_DURATION_METRIC,
 ]
@@ -245,6 +297,18 @@ metric_order = [
     UPDATE_PEAK_MEMORY_USAGE_METRIC,
     UPDATE_AVG_MEMORY_USAGE_TOTAL_METRIC,
     UPDATE_PEAK_MEMORY_USAGE_TOTAL_METRIC,
+    INSERT_AVG_CPU_USAGE_METRIC,
+    INSERT_PEAK_CPU_USAGE_METRIC,
+    INSERT_AVG_MEMORY_USAGE_METRIC,
+    INSERT_PEAK_MEMORY_USAGE_METRIC,
+    INSERT_AVG_MEMORY_USAGE_TOTAL_METRIC,
+    INSERT_PEAK_MEMORY_USAGE_TOTAL_METRIC,
+    READ_AVG_CPU_USAGE_METRIC,
+    READ_PEAK_CPU_USAGE_METRIC,
+    READ_AVG_MEMORY_USAGE_METRIC,
+    READ_PEAK_MEMORY_USAGE_METRIC,
+    READ_AVG_MEMORY_USAGE_TOTAL_METRIC,
+    READ_PEAK_MEMORY_USAGE_TOTAL_METRIC,
     READ_LATENCY_P99_METRIC,
     WRITE_LATENCY_P99_METRIC,
     UPDATE_LATENCY_P99_METRIC,
