@@ -302,11 +302,12 @@ DB_CONFIG_TOOLTIPS: dict[str, str] = {
     "clickhouse_server_version": "ClickHouse auto-provision only (`clickhouse/clickhouse-server:<tag>`): Docker image version/tag. Default uses LTS; set e.g. `26.5` to test a newer release.",
     "query_plan_optimize_lazy_materialization": "ClickHouse only (`query_plan_optimize_lazy_materialization`): when enabled, applies `SET query_plan_optimize_lazy_materialization = 1` for benchmark queries.",
     "max_query_size": "ClickHouse only (`max_query_size`): maximum SQL text size per query. UI input is in KB and converted to bytes for the benchmark session. Increase when using batched update queries with large vectors.",
+    "config_port": "Vespa only: config server / deploy API port (default 19071). Used once at startup to deploy the schema; separate from the query/document API `port` (default 8080). Auto-provisioning fills this in automatically since Docker maps it to a random host port.",
 }
 
 # DB config keys grouped for section headers (order preserved)
 DB_CONFIG_GROUP_ORDER: list[tuple[str, list[str]]] = [
-    ("Connection", ["host", "port", "uri", "url", "user", "password", "api_key", "token"]),
+    ("Connection", ["host", "port", "config_port", "uri", "url", "user", "password", "api_key", "token"]),
     (
         "Profiling",
         ["enable_flamegraph", "flamegraph_real_time_period_ns", "flamegraph_cpu_time_period_ns"],

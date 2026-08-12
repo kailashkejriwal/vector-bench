@@ -12,11 +12,15 @@ VespaQuantizationType: TypeAlias = Literal["none", "binary"]
 class VespaConfig(DBConfig):
     url: SecretStr = "http://127.0.0.1"
     port: int = 8080
+    # Config server / deploy API port. Defaults to Vespa's standard 19071, but under Docker
+    # auto-provisioning the host port is randomized and can differ from the query port's mapping.
+    config_port: int = 19071
 
     def to_dict(self):
         return {
             "url": self.url.get_secret_value(),
             "port": self.port,
+            "config_port": self.config_port,
         }
 
 

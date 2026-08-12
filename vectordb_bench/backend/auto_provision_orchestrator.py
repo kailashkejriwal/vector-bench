@@ -91,6 +91,27 @@ def _metrics_quiet_window(gap: int, after_db: DB, before_db: DB | None) -> None:
     time.sleep(gap)
 
 
+def _inter_case_cooldown(db: DB, prev_case_name: str, next_case_name: str) -> None:
+    """Idle period between two cases run back-to-back on the SAME DB instance (no teardown in between)."""
+    gap = config.INTER_CASE_COOLDOWN_SEC
+    if gap <= 0:
+        return
+    if config.POST_PROVISION_SYNC_BEFORE_COOLDOWN:
+        try:
+            log.info("POST_PROVISION_SYNC_BEFORE_COOLDOWN: running sync(1) before inter-case cooldown")
+            subprocess.run(["sync"], timeout=300, check=False)
+        except Exception as e:
+            log.warning("sync before inter-case cooldown failed: %s", e)
+    log.info(
+        "INTER_CASE_COOLDOWN sec=%s db=%s after_case=%r before_case=%r",
+        gap,
+        db.name,
+        prev_case_name,
+        next_case_name,
+    )
+    time.sleep(gap)
+
+
 def run_with_auto_provision(
     case_runners: list[CaseRunner],
     drop_old: bool,
@@ -228,6 +249,8 @@ def run_with_auto_provision(
             cached_load_duration = None
             cached_write_qps = 0.0
             for i, r in enumerate(runners):
+                if i > 0:
+                    _inter_case_cooldown(db, runners[i - 1].display(), r.display())
                 r.config.db_config = new_db_config
                 # Run load for every instance so each gets its own load_duration and write_qps
                 # (different instances can have different indexing/config; reusing would show same duration and 0 write_qps)
@@ -279,6 +302,7 @@ def run_with_auto_provision(
 
     # Manual runners (existing order) with same drop/cache logic as original
     latest_runner = None
+    prev_manual_runner = None
     cached_load_duration = None
     cached_write_qps = 0.0
     first_manual_runner = True
@@ -292,7 +316,16 @@ def run_with_auto_provision(
             skip = first_manual_runner and cooldown_state["first_manual_transition_pre_slept"]
             if not skip:
                 _metrics_quiet_window(gap, last_completed_db, r.config.db)
+        elif (
+            not first_manual_runner
+            and last_completed_db is not None
+            and last_completed_db == r.config.db
+            and prev_manual_runner is not None
+        ):
+            # Same DB instance as the previous case (no teardown in between) -> inter-case cooldown instead.
+            _inter_case_cooldown(r.config.db, prev_manual_runner.display(), r.display())
         first_manual_runner = False
+        prev_manual_runner = r
         use_drop = drop_old and not (latest_runner and r == latest_runner)
         case_res, cached_load_duration, cached_write_qps = run_one(
             r, use_drop, cached_load_duration, cached_write_qps

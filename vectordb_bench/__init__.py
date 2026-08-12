@@ -86,6 +86,8 @@ class config:
     MILVUS_LOAD_RETRY_INTERVAL_SEC = env.int("MILVUS_LOAD_RETRY_INTERVAL_SEC", 3)
     # Qdrant (Docker) storage on NVMe: mounts to /qdrant/storage in container
     QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
+    # Vespa (Docker) storage on NVMe: mounts to /opt/vespa/var in container
+    VESPA_DATA_DIR = env.str("VESPA_DATA_DIR", "")
     # REST API timeout for qdrant-client (seconds). Library default is 5s; create_collection can exceed that on slow disks.
     QDRANT_CLIENT_TIMEOUT_SEC = env.int("QDRANT_CLIENT_TIMEOUT_SEC", 120)
     # Scope resource metrics (CPU/memory/disk IO) to the DB's own Docker container instead of the whole host/VM.
@@ -93,6 +95,8 @@ class config:
     MONITOR_DB_CONTAINER_STATS = env.bool("MONITOR_DB_CONTAINER_STATS", True)
     # Explicit Qdrant container name or id to monitor. Empty = auto-detect the running `qdrant/qdrant` container.
     QDRANT_CONTAINER = env.str("QDRANT_CONTAINER", "")
+    # Explicit Vespa container name or id to monitor. Empty = auto-detect the running `vespaengine/vespa` container.
+    VESPA_CONTAINER = env.str("VESPA_CONTAINER", "")
     # PgVector (Docker): host path mounted to Postgres PGDATA for persistence / large disk (e.g. NVMe).
     PGVECTOR_DATA_DIR = env.str("PGVECTOR_DATA_DIR", "")
     # Image for auto-provisioned PgVector. Docker Hub often has no :latest; pin a pgNN tag.
@@ -106,6 +110,13 @@ class config:
     POST_PROVISION_TEARDOWN_DELAY_SEC = env.int("POST_PROVISION_TEARDOWN_DELAY_SEC", 0)
     # Run `sync` once before each quiet window (may help disk-usage panels settle; does not drop page cache).
     POST_PROVISION_SYNC_BEFORE_COOLDOWN = env.bool("POST_PROVISION_SYNC_BEFORE_COOLDOWN", False)
+    # Seconds to idle between consecutive cases run back-to-back on the SAME DB instance/container
+    # (no provision/teardown in between, e.g. several Qdrant cases against one auto-started container,
+    # or several cases against one manually-started DB). Lets CPU settle and page cache/allocations from
+    # the previous case unwind before the next case's resource metrics start being sampled. 0 = no delay.
+    # This is on top of / separate from POST_PROVISION_TEARDOWN_DELAY_SEC, which only applies BETWEEN
+    # different DB instances (after teardown of one before provisioning the next).
+    INTER_CASE_COOLDOWN_SEC = env.int("INTER_CASE_COOLDOWN_SEC", 0)
     # Max seconds to poll `docker inspect` until the container is gone after rm (clean handoff for host metrics).
     DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC = env.int("DOCKER_CONTAINER_REMOVAL_WAIT_TIMEOUT_SEC", 120)
     # Omit `docker run --memory`; container can grow until the host runs out of RAM (useful for heavy Milvus on VMs).

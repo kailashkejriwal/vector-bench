@@ -232,9 +232,15 @@ class DockerContainerProvisioner(Provisioner):
     container_id: str | None = None
     image: str = ""
     container_port: int = 0
+    # Additional container ports to publish/inspect besides `container_port` (e.g. a DB with a
+    # separate admin/deploy API port). Populated into `self.extra_host_ports` during provision().
+    extra_ports: list[int] = []
     env: list[str] | None = None
     command: list[str] | None = None  # optional CMD after image, e.g. ["milvus", "run", "standalone"]
     host: str = "127.0.0.1"
+
+    def __init__(self) -> None:
+        self.extra_host_ports: dict[int, str] = {}
 
     def is_available(self) -> bool:
         return docker_available()
@@ -263,8 +269,12 @@ class DockerContainerProvisioner(Provisioner):
             "-d",
             "--pull", "always",
             "-p", str(self.container_port),  # publish to random host port
-            "--cpus", _cpus_for_docker(resource_profile.cpu),
         ]
+        for extra_port in self.extra_ports:
+            args.extend(["-p", str(extra_port)])
+        args.extend([
+            "--cpus", _cpus_for_docker(resource_profile.cpu),
+        ])
         if getattr(config, "PROVISION_DOCKER_MEMORY_UNLIMITED", False):
             log.info(
                 "Provision step: PROVISION_DOCKER_MEMORY_UNLIMITED=1 — omitting docker --memory (host RAM only)"
@@ -329,6 +339,17 @@ class DockerContainerProvisioner(Provisioner):
         host_port = _inspect_port(self.container_id, self.container_port)
         host_port_int = int(host_port)
         log.info("Provision step: inspected host port=%s (container_port=%s)", host_port, self.container_port)
+        self.extra_host_ports = {}
+        for extra_port in self.extra_ports:
+            try:
+                self.extra_host_ports[extra_port] = _inspect_port(self.container_id, extra_port)
+                log.info(
+                    "Provision step: inspected extra host port=%s (container_port=%s)",
+                    self.extra_host_ports[extra_port],
+                    extra_port,
+                )
+            except RuntimeError as e:
+                log.warning("Provision step: could not inspect extra port %s: %s", extra_port, e)
         # Capture logs (without --rm, exited containers remain so logs are available)
         self._log_container_logs("Provision step: docker logs (startup)", tail=100)
         log.info("Provision step: waiting %ds for process to bind", DEFAULT_READINESS_WAIT_SEC)

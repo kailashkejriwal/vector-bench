@@ -3454,6 +3454,7 @@ CASE_CONFIG_MAP = {
     DB.Vespa: {
         CaseLabel.Load: VespaLoadingConfig,
         CaseLabel.Performance: VespaPerformanceConfig,
+        CaseLabel.Streaming: VespaPerformanceConfig,
     },
     DB.LanceDB: {
         CaseLabel.Load: LanceDBLoadConfig,

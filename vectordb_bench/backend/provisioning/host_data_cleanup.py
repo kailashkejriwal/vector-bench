@@ -157,6 +157,7 @@ def _raw_dir_for_db(db: DB) -> str:
         DB.Milvus: config.MILVUS_DATA_DIR,
         DB.QdrantLocal: config.QDRANT_DATA_DIR,
         DB.PgVector: config.PGVECTOR_DATA_DIR,
+        DB.Vespa: config.VESPA_DATA_DIR,
     }
     return (mapping.get(db) or "").strip()
 

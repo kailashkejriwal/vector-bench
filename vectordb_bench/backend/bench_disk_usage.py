@@ -20,6 +20,7 @@ def configured_host_db_data_dir(db: DB) -> pathlib.Path | None:
         DB.Milvus: config.MILVUS_DATA_DIR,
         DB.QdrantLocal: config.QDRANT_DATA_DIR,
         DB.PgVector: config.PGVECTOR_DATA_DIR,
+        DB.Vespa: config.VESPA_DATA_DIR,
     }
     raw = (mapping.get(db) or "").strip()
     if not raw:

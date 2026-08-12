@@ -23,12 +23,15 @@ log = logging.getLogger(__name__)
 # Docker image (ancestor) used to auto-detect the running container per DB.
 _DB_IMAGE_ANCESTORS: dict[DB, str] = {
     DB.QdrantLocal: "qdrant/qdrant",
+    DB.Vespa: "vespaengine/vespa",
 }
 
 
 def _explicit_container_for_db(db: DB) -> str:
     if db == DB.QdrantLocal:
         return (getattr(config, "QDRANT_CONTAINER", "") or "").strip()
+    if db == DB.Vespa:
+        return (getattr(config, "VESPA_CONTAINER", "") or "").strip()
     return ""
 
 

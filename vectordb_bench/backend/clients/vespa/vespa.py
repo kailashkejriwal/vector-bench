@@ -226,7 +226,8 @@ class Vespa(VectorDB):
         """
         import requests
 
-        url = self.db_config["url"] + ":19071/application/v2/tenant/default/prepareandactivate"
+        config_port = self.db_config.get("config_port", 19071)
+        url = self.db_config["url"] + f":{config_port}/application/v2/tenant/default/prepareandactivate"
         package_data = self.application_package.to_zip()
         headers = {"Content-Type": "application/zip"}
 

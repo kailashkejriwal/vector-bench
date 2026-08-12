@@ -4,6 +4,8 @@ import multiprocessing as mp
 import os
 import pathlib
 import signal
+import subprocess
+import time
 import traceback
 import uuid
 from collections.abc import Callable
@@ -32,6 +34,27 @@ log = logging.getLogger(__name__)
 global_result_future: concurrent.futures.Future | None = None
 
 
+def _inter_case_cooldown(db_name: str, prev_case_name: str, next_case_name: str) -> None:
+    """Idle period between two cases run back-to-back against the same (already-running) DB instance."""
+    gap = config.INTER_CASE_COOLDOWN_SEC
+    if gap <= 0:
+        return
+    if config.POST_PROVISION_SYNC_BEFORE_COOLDOWN:
+        try:
+            log.info("POST_PROVISION_SYNC_BEFORE_COOLDOWN: running sync(1) before inter-case cooldown")
+            subprocess.run(["sync"], timeout=300, check=False)
+        except Exception as e:
+            log.warning("sync before inter-case cooldown failed: %s", e)
+    log.info(
+        "INTER_CASE_COOLDOWN sec=%s db=%s after_case=%r before_case=%r",
+        gap,
+        db_name,
+        prev_case_name,
+        next_case_name,
+    )
+    time.sleep(gap)
+
+
 def _async_task_entry(running_task: TaskRunner, drop_old_flag: bool, send_conn: Connection) -> None:
     """Process-pool entrypoint. Keep as module-level function to avoid pickling `self`."""
     try:
@@ -52,6 +75,10 @@ def _async_task_entry(running_task: TaskRunner, drop_old_flag: bool, send_conn: 
             c_results = []
             latest_runner, cached_load_duration = None, None
             for idx, runner in enumerate(running_task.case_runners):
+                if idx > 0:
+                    prev_runner = running_task.case_runners[idx - 1]
+                    if runner.config.db == prev_runner.config.db:
+                        _inter_case_cooldown(runner.config.db.name, prev_runner.display(), runner.display())
                 case_res = CaseResult(
                     metrics=Metric(),
                     task_config=runner.config,

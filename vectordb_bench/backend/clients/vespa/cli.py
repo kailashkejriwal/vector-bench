@@ -22,6 +22,10 @@ class VespaTypedDict(CommonTypedDict, HNSWFlavor1):
         int,
         click.option("--port", "-p", type=int, help="connection port", default=8080),
     ]
+    config_port: Annotated[
+        int,
+        click.option("--config-port", type=int, help="config server / deploy API port", default=19071),
+    ]
     quantization: Annotated[
         str, click.option("--quantization", type=click.Choice(["none", "binary"], case_sensitive=False), default="none")
     ]
@@ -41,7 +45,7 @@ def Vespa(**params: Unpack[VespaTypedDict]):
 
     run(
         db=DB.Vespa,
-        db_config=VespaConfig(url=SecretStr(params["uri"]), port=params["port"]),
+        db_config=VespaConfig(url=SecretStr(params["uri"]), port=params["port"], config_port=params["config_port"]),
         db_case_config=VespaHNSWConfig(**{k: v for k, v in case_params.items() if v}),
         **params,
     )

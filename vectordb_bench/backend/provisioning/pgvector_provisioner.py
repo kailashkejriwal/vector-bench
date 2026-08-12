@@ -37,6 +37,7 @@ class PgVectorDockerProvisioner(DockerContainerProvisioner):
     ]
 
     def __init__(self) -> None:
+        super().__init__()
         # Pin via PGVECTOR_DOCKER_IMAGE — :latest is often missing on Docker Hub.
         img = (config.PGVECTOR_DOCKER_IMAGE or "").strip()
         self.image = img or "pgvector/pgvector:pg16"

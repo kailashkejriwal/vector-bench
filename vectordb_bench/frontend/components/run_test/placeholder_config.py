@@ -31,6 +31,11 @@ PLACEHOLDER_CONFIG: dict[DB, dict] = {
         "api_key": "",
         "no_auth": True,
     },
+    DB.Vespa: {
+        "url": "http://127.0.0.1",
+        "port": 8080,
+        "config_port": 19071,
+    },
 }
 
 
