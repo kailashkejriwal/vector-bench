@@ -328,6 +328,16 @@ class QdrantLocalTypedDict(CommonTypedDict):
             help="Write ordering guarantee for upserts",
         ),
     ]
+    upsert_batch_size: Annotated[
+        int,
+        click.option(
+            "--upsert-batch-size",
+            type=int,
+            default=500,
+            help="Vectors per client.upsert() call (real network batch size, independent of "
+            "the runner's --insert-batch-size). Higher = far fewer round trips for large loads.",
+        ),
+    ]
 
 
 @cli.command()
@@ -390,6 +400,7 @@ def QdrantLocal(**parameters: Unpack[QdrantLocalTypedDict]):
             search_timeout_sec=parameters["search_timeout_sec"],
             wait=parameters["wait"],
             write_ordering=parameters["write_ordering"],
+            upsert_batch_size=parameters["upsert_batch_size"],
         ),
         **parameters,
     )

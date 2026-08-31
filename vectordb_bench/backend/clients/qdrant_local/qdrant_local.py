@@ -28,7 +28,6 @@ from .config import QdrantLocalIndexConfig, _none_if_zero
 log = logging.getLogger(__name__)
 
 SECONDS_WAITING_FOR_INDEXING_API_CALL = 5
-QDRANT_BATCH_SIZE = 100
 _CREATE_COLLECTION_RETRIES = 5
 _CREATE_COLLECTION_RETRY_BASE_SEC = 2.0
 
@@ -92,6 +91,7 @@ class QdrantLocal(VectorDB):
         # Cache write/search request behaviour from the case config.
         self._wait = self.case_config.wait
         self._write_ordering = self.case_config.parse_write_ordering()
+        self._upsert_batch_size = max(1, int(self.case_config.upsert_batch_size))
         self._search_consistency = self.case_config.parse_search_consistency()
         self._search_timeout = _none_if_zero(self.case_config.search_timeout_sec)
 
@@ -303,11 +303,12 @@ class QdrantLocal(VectorDB):
         # so Qdrant indexes each segment as it fills up while ingestion is still in progress -
         # simulating a real-world concurrent write+index workload instead of a bulk-load mode.
         try:
-            for offset in range(0, len(embeddings_list), QDRANT_BATCH_SIZE):
-                vectors = embeddings_list[offset : offset + QDRANT_BATCH_SIZE]
-                ids = metadata[offset : offset + QDRANT_BATCH_SIZE]
+            upsert_batch_size = self._upsert_batch_size
+            for offset in range(0, len(embeddings_list), upsert_batch_size):
+                vectors = embeddings_list[offset : offset + upsert_batch_size]
+                ids = metadata[offset : offset + upsert_batch_size]
                 if self.with_scalar_labels and labels_data is not None:
-                    labels = labels_data[offset : offset + QDRANT_BATCH_SIZE]
+                    labels = labels_data[offset : offset + upsert_batch_size]
                     payloads = [
                         {self._primary_field: pk, self._scalar_label_field: labels[i]}
                         for i, pk in enumerate(ids)
@@ -366,12 +367,13 @@ class QdrantLocal(VectorDB):
             return 0, ValueError("labels_data must be provided for scalar-label collections")
 
         updated = 0
+        upsert_batch_size = self._upsert_batch_size
         try:
-            for offset in range(0, len(emb_list), QDRANT_BATCH_SIZE):
-                vectors = emb_list[offset : offset + QDRANT_BATCH_SIZE]
-                ids = metadata[offset : offset + QDRANT_BATCH_SIZE]
+            for offset in range(0, len(emb_list), upsert_batch_size):
+                vectors = emb_list[offset : offset + upsert_batch_size]
+                ids = metadata[offset : offset + upsert_batch_size]
                 if self.with_scalar_labels:
-                    labels = labels_data[offset : offset + QDRANT_BATCH_SIZE]
+                    labels = labels_data[offset : offset + upsert_batch_size]
                     payloads = [{self._primary_field: pk, self._scalar_label_field: labels[i]} for i, pk in enumerate(ids)]
                 else:
                     payloads = [{self._primary_field: pk} for pk in ids]

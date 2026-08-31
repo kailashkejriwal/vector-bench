@@ -118,6 +118,14 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     # --- Write request behaviour (client.upsert kwargs) ---
     wait: bool = True  # wait for the operation to be applied before returning
     write_ordering: str = "weak"  # weak | medium | strong
+    # Vectors sent per client.upsert() call (the actual network/wire batch size). Independent
+    # of the benchmark's higher-level "insert_batch_size" (how many vectors are accumulated
+    # client-side before handing off to the DB adapter) - insert_embeddings() always re-chunks
+    # into requests of this size before sending. Larger values mean far fewer round trips for
+    # large datasets (e.g. 1M vectors / 100 = 10,000 requests vs. /1000 = 1,000 requests), which
+    # dominates ingestion time far more than insert_batch_size does. Qdrant's own qdrant_cloud
+    # client in this repo defaults to 500; 100 here was needlessly conservative.
+    upsert_batch_size: int = 500
 
     # --- Benchmark update stage (not a Qdrant setting) ---
     enable_update_stage: bool = False

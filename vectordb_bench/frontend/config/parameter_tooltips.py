@@ -170,6 +170,14 @@ PARAM_TOOLTIPS: dict[str, str] = {
     "search_timeout_sec": "Qdrant: Per-request search timeout in seconds. Performance impact: aborts slow queries early to bound tail latency. 0 = unset (use client/server default).",
     "wait": "Qdrant: Wait for write operations (upsert) to be applied before returning. Performance impact: true (default) is safer but slower inserts/updates; false returns immediately for higher write throughput with eventual visibility.",
     "write_ordering": "Qdrant: Write ordering guarantee for upserts (weak/medium/strong). Performance impact: weak (default) is fastest; medium/strong trade write throughput for stronger ordering guarantees across replicas.",
+    "upsert_batch_size": (
+        "Qdrant: Vectors sent per client.upsert() call - the real network batch size (independent of "
+        "the benchmark's separate 'insert_batch_size', which only controls client-side buffering). "
+        "Performance impact: usually the dominant factor in ingestion speed for large datasets - e.g. "
+        "1M vectors at 100/request is 10,000 round trips vs. 2,000 at 500/request. Too high increases "
+        "per-request payload size and memory; Qdrant's own qdrant-cloud client in this repo defaults "
+        "to 500. Default 500."
+    ),
 }
 
 # ---------------------------------------------------------------------------
@@ -297,6 +305,7 @@ PARAM_GROUPS: dict[str, str] = {
     "search_timeout_sec": "Search request behavior",
     "wait": "Write behavior",
     "write_ordering": "Write behavior",
+    "upsert_batch_size": "Write behavior",
 }
 
 

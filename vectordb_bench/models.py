@@ -203,6 +203,7 @@ class CaseConfigParamType(Enum):
     search_acorn = "search_acorn"
     wait = "wait"
     write_ordering = "write_ordering"
+    upsert_batch_size = "upsert_batch_size"
     search_consistency = "search_consistency"
     search_timeout_sec = "search_timeout_sec"
     vector_memory = "vector_memory"

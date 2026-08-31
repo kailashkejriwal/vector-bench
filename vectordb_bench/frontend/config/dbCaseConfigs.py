@@ -2779,6 +2779,15 @@ CaseConfigParamInput_write_ordering_QdrantLocal = CaseConfigInput(
     inputType=InputType.Option,
     inputConfig={"options": ["weak", "medium", "strong"]},
 )
+CaseConfigParamInput_upsert_batch_size_QdrantLocal = CaseConfigInput(
+    label=_opt_param("upsert_batch_size"),
+    displayLabel="Upsert batch size (vectors/request)",
+    inputHelp="Vectors sent per client.upsert() call - the real network batch size, independent of "
+    "the benchmark's 'Insert Batch Size' setting (which only controls client-side buffering). "
+    "Higher = far fewer round trips for large datasets and much faster ingestion. Default 500.",
+    inputType=InputType.Number,
+    inputConfig={"min": 1, "max": 100_000, "value": 500},
+)
 
 QdrantLocalLoadConfig = [
     # HNSW index
@@ -2830,6 +2839,7 @@ QdrantLocalLoadConfig = [
     # Write behaviour
     CaseConfigParamInput_wait_QdrantLocal,
     CaseConfigParamInput_write_ordering_QdrantLocal,
+    CaseConfigParamInput_upsert_batch_size_QdrantLocal,
 ]
 QdrantLocalPerformanceConfig = [
     *QdrantLocalLoadConfig,
