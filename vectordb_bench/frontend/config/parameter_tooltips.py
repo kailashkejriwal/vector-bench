@@ -174,9 +174,17 @@ PARAM_TOOLTIPS: dict[str, str] = {
         "Qdrant: Vectors sent per client.upsert() call - the real network batch size (independent of "
         "the benchmark's separate 'insert_batch_size', which only controls client-side buffering). "
         "Performance impact: usually the dominant factor in ingestion speed for large datasets - e.g. "
-        "1M vectors at 100/request is 10,000 round trips vs. 2,000 at 500/request. Too high increases "
-        "per-request payload size and memory; Qdrant's own qdrant-cloud client in this repo defaults "
-        "to 500. Default 500."
+        "1M vectors at 100/request is 10,000 round trips vs. 2,000 at 500/request. Automatically capped "
+        "per-run for high-dim vectors (see max_upsert_request_mb) since REST/JSON serializes each float "
+        "as text (~20 bytes/float), so very high dim x high batch size can exceed Qdrant's request-size "
+        "limit. Qdrant's own qdrant-cloud client in this repo defaults to 500. Default 500."
+    ),
+    "max_upsert_request_mb": (
+        "Qdrant: Safety cap (MB) on the estimated JSON size of one client.upsert() request; "
+        "upsert_batch_size is automatically reduced for high-dimensional vectors to stay under this, "
+        "preventing a 'JSON payload ... larger than allowed' 400 error. Qdrant's own REST default "
+        "request-size limit is 32 MB (server env QDRANT__SERVICE__MAX_REQUEST_SIZE_MB); raise both "
+        "together if you need larger requests and have configured the server accordingly. Default 28."
     ),
 }
 
@@ -306,6 +314,7 @@ PARAM_GROUPS: dict[str, str] = {
     "wait": "Write behavior",
     "write_ordering": "Write behavior",
     "upsert_batch_size": "Write behavior",
+    "max_upsert_request_mb": "Write behavior",
 }
 
 

@@ -31,6 +31,23 @@ SECONDS_WAITING_FOR_INDEXING_API_CALL = 5
 _CREATE_COLLECTION_RETRIES = 5
 _CREATE_COLLECTION_RETRY_BASE_SEC = 2.0
 
+# REST/JSON serializes each vector component as decimal text, not 4-byte binary, so a JSON
+# upsert body is much larger than the raw vector data. Measured empirically (qdrant-client
+# Batch model, dim 128/768/1536): ~20.3 bytes per float, stable across dimensions. Rounded up
+# with margin (id/payload/braces/commas overhead) so estimates stay conservative.
+_JSON_BYTES_PER_FLOAT = 20.5
+_JSON_POINT_OVERHEAD_BYTES = 64
+
+
+def _safe_upsert_batch_size(dim: int, requested_batch_size: int, max_request_mb: float) -> int:
+    """Clamp requested_batch_size so an upsert() JSON request for `dim`-sized vectors stays
+    under max_request_mb, avoiding Qdrant's "JSON payload ... larger than allowed" 400 error.
+    """
+    bytes_per_vector = dim * _JSON_BYTES_PER_FLOAT + _JSON_POINT_OVERHEAD_BYTES
+    max_bytes = max(1.0, max_request_mb) * 1024 * 1024
+    safe_size = max(1, int(max_bytes / bytes_per_vector))
+    return min(max(1, requested_batch_size), safe_size)
+
 
 def _is_transient_qdrant_api_error(err: BaseException) -> bool:
     msg = str(err).lower()
@@ -91,7 +108,18 @@ class QdrantLocal(VectorDB):
         # Cache write/search request behaviour from the case config.
         self._wait = self.case_config.wait
         self._write_ordering = self.case_config.parse_write_ordering()
-        self._upsert_batch_size = max(1, int(self.case_config.upsert_batch_size))
+        requested_upsert_batch_size = max(1, int(self.case_config.upsert_batch_size))
+        self._upsert_batch_size = _safe_upsert_batch_size(
+            dim, requested_upsert_batch_size, self.case_config.max_upsert_request_mb
+        )
+        if self._upsert_batch_size < requested_upsert_batch_size:
+            log.warning(
+                f"upsert_batch_size={requested_upsert_batch_size} would produce a JSON request of "
+                f"~{requested_upsert_batch_size * (dim * _JSON_BYTES_PER_FLOAT + _JSON_POINT_OVERHEAD_BYTES) / (1024 * 1024):.1f} MB "  # noqa: E501
+                f"for dim={dim}, exceeding the {self.case_config.max_upsert_request_mb:.0f} MB safety cap "
+                "(Qdrant's REST default request-size limit is 32 MiB). Clamping upsert_batch_size to "
+                f"{self._upsert_batch_size} for this run to avoid a 'JSON payload ... larger than allowed' error."
+            )
         self._search_consistency = self.case_config.parse_search_consistency()
         self._search_timeout = _none_if_zero(self.case_config.search_timeout_sec)
 

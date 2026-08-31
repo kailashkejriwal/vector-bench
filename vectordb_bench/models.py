@@ -204,6 +204,7 @@ class CaseConfigParamType(Enum):
     wait = "wait"
     write_ordering = "write_ordering"
     upsert_batch_size = "upsert_batch_size"
+    max_upsert_request_mb = "max_upsert_request_mb"
     search_consistency = "search_consistency"
     search_timeout_sec = "search_timeout_sec"
     vector_memory = "vector_memory"

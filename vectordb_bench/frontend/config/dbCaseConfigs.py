@@ -2784,9 +2784,20 @@ CaseConfigParamInput_upsert_batch_size_QdrantLocal = CaseConfigInput(
     displayLabel="Upsert batch size (vectors/request)",
     inputHelp="Vectors sent per client.upsert() call - the real network batch size, independent of "
     "the benchmark's 'Insert Batch Size' setting (which only controls client-side buffering). "
-    "Higher = far fewer round trips for large datasets and much faster ingestion. Default 500.",
+    "Higher = far fewer round trips for large datasets and much faster ingestion. Automatically "
+    "reduced per-run for high-dim vectors to stay under 'Max upsert request size' below. Default 500.",
     inputType=InputType.Number,
-    inputConfig={"min": 1, "max": 100_000, "value": 500},
+    inputConfig={"min": 1, "max": 1_000_000, "value": 500},
+)
+CaseConfigParamInput_max_upsert_request_mb_QdrantLocal = CaseConfigInput(
+    label=_opt_param("max_upsert_request_mb"),
+    displayLabel="Max upsert request size (MB)",
+    inputHelp="Safety cap on the estimated JSON size of one client.upsert() request; upsert batch size is "
+    "auto-reduced for high-dimensional vectors to stay under this. Qdrant's own REST default request-size "
+    "limit is 32 MB (raise both this and the server's QDRANT__SERVICE__MAX_REQUEST_SIZE_MB together if you "
+    "need larger requests). Default 28.",
+    inputType=InputType.Float,
+    inputConfig={"min": 1.0, "max": 1000.0, "value": 28.0, "step": 1.0},
 )
 
 QdrantLocalLoadConfig = [
@@ -2840,6 +2851,7 @@ QdrantLocalLoadConfig = [
     CaseConfigParamInput_wait_QdrantLocal,
     CaseConfigParamInput_write_ordering_QdrantLocal,
     CaseConfigParamInput_upsert_batch_size_QdrantLocal,
+    CaseConfigParamInput_max_upsert_request_mb_QdrantLocal,
 ]
 QdrantLocalPerformanceConfig = [
     *QdrantLocalLoadConfig,

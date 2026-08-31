@@ -335,7 +335,19 @@ class QdrantLocalTypedDict(CommonTypedDict):
             type=int,
             default=500,
             help="Vectors per client.upsert() call (real network batch size, independent of "
-            "the runner's --insert-batch-size). Higher = far fewer round trips for large loads.",
+            "the runner's --insert-batch-size). Higher = far fewer round trips for large loads. "
+            "Auto-reduced for high-dim vectors to respect --max-upsert-request-mb.",
+        ),
+    ]
+    max_upsert_request_mb: Annotated[
+        float,
+        click.option(
+            "--max-upsert-request-mb",
+            type=float,
+            default=28.0,
+            help="Safety cap (MB) on the estimated JSON size of one upsert() request; "
+            "upsert-batch-size is auto-reduced for high-dim vectors to stay under this "
+            "(Qdrant's REST default request-size limit is 32 MB).",
         ),
     ]
 
@@ -401,6 +413,7 @@ def QdrantLocal(**parameters: Unpack[QdrantLocalTypedDict]):
             wait=parameters["wait"],
             write_ordering=parameters["write_ordering"],
             upsert_batch_size=parameters["upsert_batch_size"],
+            max_upsert_request_mb=parameters["max_upsert_request_mb"],
         ),
         **parameters,
     )

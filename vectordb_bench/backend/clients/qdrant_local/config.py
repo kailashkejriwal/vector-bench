@@ -124,8 +124,18 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     # into requests of this size before sending. Larger values mean far fewer round trips for
     # large datasets (e.g. 1M vectors / 100 = 10,000 requests vs. /1000 = 1,000 requests), which
     # dominates ingestion time far more than insert_batch_size does. Qdrant's own qdrant_cloud
-    # client in this repo defaults to 500; 100 here was needlessly conservative.
+    # client in this repo defaults to 500; 100 here was needlessly conservative. This is treated
+    # as an upper bound: it is automatically clamped down per-request based on vector dimension
+    # to stay under max_upsert_request_mb (see below), since REST/JSON serializes each float as
+    # text (~20 bytes/float, not 4 bytes binary) so high dim x high batch size can otherwise
+    # exceed Qdrant's request-size limit (default 32 MiB) with a "JSON payload ... larger than
+    # allowed" 400 error.
     upsert_batch_size: int = 500
+    # Safety cap (MB) on the estimated JSON size of a single client.upsert() request; used to
+    # auto-clamp upsert_batch_size for high-dimensional vectors. Qdrant's own REST default limit
+    # is 32 MiB (33554432 bytes, configurable server-side via QDRANT__SERVICE__MAX_REQUEST_SIZE_MB);
+    # this defaults a bit under that to leave headroom for server-side overhead.
+    max_upsert_request_mb: float = 28.0
 
     # --- Benchmark update stage (not a Qdrant setting) ---
     enable_update_stage: bool = False
