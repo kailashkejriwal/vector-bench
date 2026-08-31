@@ -182,6 +182,7 @@ class CaseRunner(BaseModel):
                 self.normalize,
                 self.ca.filters,
                 self.ca.load_timeout,
+                insert_batch_size=self.config.case_config.insert_batch_size,
             )
             count = runner.run_endlessness()
         except Exception as e:
@@ -420,6 +421,7 @@ class CaseRunner(BaseModel):
                 self.normalize,
                 self.ca.filters,
                 self.ca.load_timeout,
+                insert_batch_size=self.config.case_config.insert_batch_size,
             )
             return runner.run()
         except Exception as e:

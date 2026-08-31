@@ -333,6 +333,16 @@ class CommonTypedDict(TypedDict):
             help="Time cap in minutes for the serial search stage; 0 = no cap",
         ),
     ]
+    insert_batch_size: Annotated[
+        int,
+        click.option(
+            "--insert-batch-size",
+            type=int,
+            default=config.INSERT_BATCH_SIZE,
+            show_default=True,
+            help="Number of vectors flushed to the DB per insert request during data loading",
+        ),
+    ]
     custom_case_name: Annotated[
         str,
         click.option(
@@ -702,6 +712,7 @@ def run(
                 concurrency_timeout=parameters["concurrency_timeout"],
             ),
             search_serial_timeout_minutes=parameters["search_serial_timeout_minutes"],
+            insert_batch_size=parameters["insert_batch_size"],
             custom_case=get_custom_case_config(parameters),
         ),
         stages=parse_task_stages(

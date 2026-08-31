@@ -254,6 +254,8 @@ class CaseConfig(BaseModel):
     concurrency_search_config: ConcurrencySearchConfig = ConcurrencySearchConfig()
     # Time cap (minutes) for the serial search stage; 0/None = no cap (run to completion).
     search_serial_timeout_minutes: float = config.SEARCH_SERIAL_TIMEOUT_MINUTES
+    # Number of vectors flushed to the DB per insert_embeddings() call during data loading.
+    insert_batch_size: int = config.INSERT_BATCH_SIZE
 
     '''
     @property

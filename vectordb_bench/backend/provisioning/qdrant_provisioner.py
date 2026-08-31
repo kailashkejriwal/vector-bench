@@ -31,6 +31,12 @@ class QdrantDockerProvisioner(DockerContainerProvisioner):
     image = QDRANT_IMAGE
     container_port = QDRANT_HTTP_PORT
 
+    def __init__(self) -> None:
+        super().__init__()
+        # Fixed host port so Qdrant is reachable at a stable address on the VM (e.g. <vm-ip>:6333),
+        # instead of a random ephemeral port that changes every run.
+        self.fixed_host_port = QDRANT_HTTP_PORT if config.QDRANT_FIXED_HOST_PORT else None
+
     def _wait_until_ready(self, host: str, port: int, timeout_sec: int = 600) -> None:
         """Qdrant accepts TCP before the REST layer is ready; poll GET / until HTTP responds."""
         base = f"http://{host}:{port}"

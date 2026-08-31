@@ -89,6 +89,10 @@ class config:
     MILVUS_LOAD_RETRY_INTERVAL_SEC = env.int("MILVUS_LOAD_RETRY_INTERVAL_SEC", 3)
     # Qdrant (Docker) storage on NVMe: mounts to /qdrant/storage in container
     QDRANT_DATA_DIR = env.str("QDRANT_DATA_DIR", "")
+    # Publish the auto-provisioned Qdrant container's HTTP port at a fixed host port (6333) instead
+    # of a random ephemeral one, so it's reachable at a stable address on the VM (e.g. <vm-ip>:6333).
+    # Falls back to a random host port if 6333 is already in use.
+    QDRANT_FIXED_HOST_PORT = env.bool("QDRANT_FIXED_HOST_PORT", True)
     # Vespa (Docker) storage on NVMe: mounts to /opt/vespa/var in container
     VESPA_DATA_DIR = env.str("VESPA_DATA_DIR", "")
     # REST API timeout for qdrant-client (seconds). Library default is 5s; create_collection can exceed that on slow disks.

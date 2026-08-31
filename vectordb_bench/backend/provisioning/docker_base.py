@@ -140,6 +140,29 @@ def _inspect_port(container_id: str, container_port: int) -> str:
     )
 
 
+def _remove_dangling_created_containers(image: str) -> None:
+    """When `docker run` fails to bind a port, Docker still creates the container (left in
+    "Created" state, never started) before the failure; the id is never returned to us since
+    stdout is empty on failure. Best-effort sweep containers of this image stuck in "Created"
+    state (a container only sits in that state on a failed `docker run -d ...`, since our code
+    never does a separate `docker create`) so they don't linger. Failures here are non-fatal.
+    """
+    try:
+        out = subprocess.run(
+            ["docker", "ps", "-a", "--filter", f"ancestor={image}", "--filter", "status=created", "-q"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        dangling_ids = [line for line in (out.stdout or "").splitlines() if line.strip()]
+        for dangling_id in dangling_ids:
+            subprocess.run(["docker", "rm", "-f", dangling_id], capture_output=True, text=True, timeout=10, check=False)
+            log.info("Provision step: removed dangling container %s left by failed docker run", dangling_id[:12])
+    except Exception as e:
+        log.warning("Provision step: could not sweep dangling created containers for image %s: %s", image, e)
+
+
 def _container_still_exists(container_id: str) -> bool:
     proc = subprocess.run(
         ["docker", "inspect", container_id],
@@ -238,6 +261,10 @@ class DockerContainerProvisioner(Provisioner):
     env: list[str] | None = None
     command: list[str] | None = None  # optional CMD after image, e.g. ["milvus", "run", "standalone"]
     host: str = "127.0.0.1"
+    # When set, publish `container_port` at this exact host port (e.g. so it's reachable at a
+    # stable, predictable address on the VM) instead of a random ephemeral one. Falls back to a
+    # random host port if this port is already allocated on the host.
+    fixed_host_port: int | None = None
 
     def __init__(self) -> None:
         self.extra_host_ports: dict[int, str] = {}
@@ -253,13 +280,17 @@ class DockerContainerProvisioner(Provisioner):
         """Optional `--shm-size` for docker run (e.g. Postgres parallel CREATE INDEX uses /dev/shm)."""
         return []
 
-    def _run_container(
+    def _port_publish_args(self, use_fixed_host_port: bool) -> list[str]:
+        if use_fixed_host_port and self.fixed_host_port:
+            return ["-p", f"{self.fixed_host_port}:{self.container_port}"]
+        return ["-p", str(self.container_port)]  # publish to random host port
+
+    def _build_run_args(
         self,
         resource_profile: ResourceProfile,
-        extra_args: list[str] | None = None,
-    ) -> str:
-        """Run container with -d, return container ID. Do not use --rm so we can
-        capture logs from containers that exit quickly (e.g. crash on startup)."""
+        extra_args: list[str] | None,
+        use_fixed_host_port: bool,
+    ) -> list[str]:
         combined = list(self._get_extra_container_args())
         if extra_args:
             combined.extend(extra_args)
@@ -268,7 +299,7 @@ class DockerContainerProvisioner(Provisioner):
             "run",
             "-d",
             "--pull", "always",
-            "-p", str(self.container_port),  # publish to random host port
+            *self._port_publish_args(use_fixed_host_port),
         ]
         for extra_port in self.extra_ports:
             args.extend(["-p", str(extra_port)])
@@ -292,8 +323,37 @@ class DockerContainerProvisioner(Provisioner):
         args.append(self.image)
         if self.command:
             args.extend(self.command)
+        return args
+
+    def _run_container(
+        self,
+        resource_profile: ResourceProfile,
+        extra_args: list[str] | None = None,
+    ) -> str:
+        """Run container with -d, return container ID. Do not use --rm so we can
+        capture logs from containers that exit quickly (e.g. crash on startup)."""
+        args = self._build_run_args(resource_profile, extra_args, use_fixed_host_port=True)
         log.info("Provision step: running docker run (timeout=%ds)", PROVISION_TIMEOUT_SEC)
-        out = _run(args, timeout=PROVISION_TIMEOUT_SEC)
+        try:
+            out = _run(args, timeout=PROVISION_TIMEOUT_SEC)
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr or ""
+            port_in_use = self.fixed_host_port and (
+                "port is already allocated" in stderr or "address already in use" in stderr
+            )
+            if not port_in_use:
+                raise
+            log.warning(
+                "Provision step: host port %d is already in use; falling back to a random host port. "
+                "(stderr=%s)",
+                self.fixed_host_port,
+                stderr.strip(),
+            )
+            # Docker creates the container before failing to bind the port, leaving a dangling
+            # "Created" container behind; best-effort remove it.
+            _remove_dangling_created_containers(self.image)
+            fallback_args = self._build_run_args(resource_profile, extra_args, use_fixed_host_port=False)
+            out = _run(fallback_args, timeout=PROVISION_TIMEOUT_SEC)
         cid = (out.stdout or "").strip()
         if not cid:
             raise RuntimeError("Docker run did not return container ID")

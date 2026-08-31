@@ -50,6 +50,15 @@ def advancedSettings(st):
     container[1].caption("K value for number of nearest neighbors to search")
 
     container = st.columns([1, 2])
+    insert_batch_size = container[0].number_input(
+        "Insert Batch Size", min_value=1, value=config.INSERT_BATCH_SIZE, label_visibility="collapsed"
+    )
+    container[1].caption(
+        "number of vectors flushed to the DB per insert request during data loading; "
+        "larger batches usually improve load throughput but use more memory."
+    )
+
+    container = st.columns([1, 2])
     defaultconcurrentInput = ",".join(map(str, config.NUM_CONCURRENCY))
     concurrentInput = container[0].text_input(
         "Concurrent Input", value=defaultconcurrentInput, label_visibility="collapsed"
@@ -82,6 +91,7 @@ def advancedSettings(st):
         index_already_exists,
         use_aliyun,
         k,
+        insert_batch_size,
         concurrentInput,
         concurrency_duration,
         run_search_serial,
@@ -94,6 +104,7 @@ def controlPanel(st, tasks: list[TaskConfig], taskLabel, isAllValid):
         index_already_exists,
         use_aliyun,
         k,
+        insert_batch_size,
         concurrentInput,
         concurrency_duration,
         run_search_serial,
@@ -111,6 +122,7 @@ def controlPanel(st, tasks: list[TaskConfig], taskLabel, isAllValid):
 
         for task in tasks:
             task.case_config.k = k
+            task.case_config.insert_batch_size = insert_batch_size
             task.case_config.concurrency_search_config.num_concurrency = concurrentInput_list
             task.case_config.concurrency_search_config.concurrency_duration = concurrency_duration
             task.case_config.search_serial_timeout_minutes = search_serial_timeout_minutes

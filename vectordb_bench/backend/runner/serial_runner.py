@@ -32,12 +32,14 @@ class SerialInsertRunner:
         normalize: bool,
         filters: Filter = non_filter,
         timeout: float | None = None,
+        insert_batch_size: int | None = None,
     ):
         self.timeout = timeout if isinstance(timeout, int | float) else None
         self.dataset = dataset
         self.db = db
         self.normalize = normalize
         self.filters = filters
+        self.insert_batch_size = max(1, int(insert_batch_size)) if insert_batch_size else INSERT_BATCH_SIZE
 
     def retry_insert(self, db: api.VectorDB, retry_idx: int = 0, **kwargs):
         _, error = db.insert_embeddings(**kwargs)
@@ -53,7 +55,7 @@ class SerialInsertRunner:
 
     def task(self) -> tuple[int, float]:
         count = 0
-        insert_batch_size = INSERT_BATCH_SIZE
+        insert_batch_size = self.insert_batch_size
         accum_metadata: list = []
         accum_embeddings: list = []
         accum_labels: list | None = None  # only used when filters.type == StrEqual
