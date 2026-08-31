@@ -353,7 +353,7 @@ class QdrantLocal(VectorDB):
                     vectors=vectors,
                     payload=payloads,
                     ids=ids,
-                    parallel=4,
+                    parallel=16,
                     batch_size=1024
                 )
                 t3 = time.perf_counter()
