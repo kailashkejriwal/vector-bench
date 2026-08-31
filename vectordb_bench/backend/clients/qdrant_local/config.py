@@ -25,6 +25,17 @@ def _none_if_zero(value: int | None) -> int | None:
     return value
 
 
+# Memory tier ("default" leaves the setting unset so Qdrant picks its own default).
+def _parse_memory_tier(value: str):
+    from qdrant_client.http.models import Memory
+
+    return {
+        "pinned": Memory.PINNED,
+        "cached": Memory.CACHED,
+        "cold": Memory.COLD,
+    }.get(value)
+
+
 class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     """Full set of tunable options for a self-hosted Qdrant collection.
 
@@ -41,10 +52,13 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     max_indexing_threads: int = 0  # 0 = auto (all cores)
     hnsw_on_disk: bool = False  # store the HNSW graph on disk
     payload_m: int = 0  # 0 = unset; per-payload HNSW links for tenant/payload indexing
+    hnsw_inline_storage: bool = False  # store quantized vectors inline with the HNSW graph (requires qdrant-client>=1.19.0)
+    hnsw_memory: str = "default"  # default | pinned | cached | cold (memory tier for the HNSW graph)
 
     # --- Vector storage ---
     on_disk: bool | None = False  # store raw vectors on disk (memmap)
-    vector_datatype: str = "float32"  # float32 | uint8 | float16
+    vector_datatype: str = "float32"  # float32 | uint8 | float16 | turbo4
+    vector_memory: str = "default"  # default | pinned | cached | cold (memory tier for raw vectors)
 
     # --- Optimizers (OptimizersConfigDiff) ---
     deleted_threshold: float = 0.2
@@ -55,24 +69,32 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     indexing_threshold: int = 20000  # in KB
     flush_interval_sec: int = 5
     max_optimization_threads: int = 0  # 0 = unset (auto)
+    prevent_unoptimized: bool = False  # refuse to serve search from unoptimized segments
 
     # --- Write-ahead log (WalConfigDiff) ---
     wal_capacity_mb: int = 32
     wal_segments_ahead: int = 0
+    wal_retain_closed: int = 0  # 0 = unset; number of closed WAL segments to retain for faster recovery
 
     # --- Collection level ---
     shard_number: int = 1
     replication_factor: int = 1
     write_consistency_factor: int = 1
     on_disk_payload: bool = True
+    payload_memory: str = "default"  # default | pinned | cached | cold (memory tier for payload storage)
 
     # --- Quantization ---
-    quantization_mode: str = "none"  # none | scalar | product | binary
+    quantization_mode: str = "none"  # none | scalar | product | binary | turbo
     sq_quantile: float = 0.99
     sq_always_ram: bool = False
     pq_compression: str = "x16"  # x4 | x8 | x16 | x32 | x64
     pq_always_ram: bool = False
     bq_always_ram: bool = False
+    turbo_bits: str = "bits1_5"  # bits1 | bits1_5 | bits2 | bits4 (TurboQuant compression level)
+    turbo_always_ram: bool = False
+    quant_memory: str = "default"  # default | pinned | cached | cold (memory tier for the active quantization)
+    binary_encoding: str = "one_bit"  # one_bit | two_bits | one_and_half_bits (binary quantization storage encoding)
+    binary_query_encoding: str = "default"  # default | binary | scalar4bits | scalar8bits (query-time encoding)
 
     # --- Search params (SearchParams) ---
     hnsw_ef: int | None = 0  # 0 = use Qdrant default
@@ -81,11 +103,38 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     quant_rescore: bool = False
     quant_oversampling: float = 1.0
     quant_ignore: bool = False
+    search_acorn: bool = False  # ACORN filtered-HNSW search strategy
+
+    # --- Search request behaviour (client.query_points kwargs, not SearchParams) ---
+    search_consistency: str = "default"  # default | all | majority | quorum
+    search_timeout_sec: int = 0  # 0 = unset (use client/server default)
+
+    # --- Write request behaviour (client.upsert kwargs) ---
+    wait: bool = True  # wait for the operation to be applied before returning
+    write_ordering: str = "weak"  # weak | medium | strong
 
     # --- Benchmark update stage (not a Qdrant setting) ---
     enable_update_stage: bool = False
     update_ratio: float = 0.001
     update_batch_size: int = 100
+
+    def parse_write_ordering(self):
+        from qdrant_client.http.models import WriteOrdering
+
+        return {
+            "weak": WriteOrdering.WEAK,
+            "medium": WriteOrdering.MEDIUM,
+            "strong": WriteOrdering.STRONG,
+        }.get(self.write_ordering, WriteOrdering.WEAK)
+
+    def parse_search_consistency(self):
+        from qdrant_client.http.models import ReadConsistencyType
+
+        return {
+            "all": ReadConsistencyType.ALL,
+            "majority": ReadConsistencyType.MAJORITY,
+            "quorum": ReadConsistencyType.QUORUM,
+        }.get(self.search_consistency)
 
     def parse_metric(self) -> str:
         if self.metric_type == MetricType.L2:
@@ -103,9 +152,11 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
             "float32": Datatype.FLOAT32,
             "uint8": Datatype.UINT8,
             "float16": Datatype.FLOAT16,
+            "turbo4": Datatype.TURBO4,
         }.get(self.vector_datatype, Datatype.FLOAT32)
 
     def _quantization_config(self):
+        quant_memory = _parse_memory_tier(self.quant_memory)
         if self.quantization_mode == "scalar":
             from qdrant_client.http.models import (
                 ScalarQuantization,
@@ -118,6 +169,7 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
                     type=ScalarType.INT8,
                     quantile=self.sq_quantile,
                     always_ram=self.sq_always_ram,
+                    memory=quant_memory,
                 ),
             )
         if self.quantization_mode == "product":
@@ -138,16 +190,55 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
                 product=ProductQuantizationConfig(
                     compression=compression,
                     always_ram=self.pq_always_ram,
+                    memory=quant_memory,
                 ),
             )
         if self.quantization_mode == "binary":
             from qdrant_client.http.models import (
                 BinaryQuantization,
                 BinaryQuantizationConfig,
+                BinaryQuantizationEncoding,
+                BinaryQuantizationQueryEncoding,
             )
 
+            encoding = {
+                "one_bit": BinaryQuantizationEncoding.ONE_BIT,
+                "two_bits": BinaryQuantizationEncoding.TWO_BITS,
+                "one_and_half_bits": BinaryQuantizationEncoding.ONE_AND_HALF_BITS,
+            }.get(self.binary_encoding, BinaryQuantizationEncoding.ONE_BIT)
+            query_encoding = {
+                "default": BinaryQuantizationQueryEncoding.DEFAULT,
+                "binary": BinaryQuantizationQueryEncoding.BINARY,
+                "scalar4bits": BinaryQuantizationQueryEncoding.SCALAR4BITS,
+                "scalar8bits": BinaryQuantizationQueryEncoding.SCALAR8BITS,
+            }.get(self.binary_query_encoding, BinaryQuantizationQueryEncoding.DEFAULT)
             return BinaryQuantization(
-                binary=BinaryQuantizationConfig(always_ram=self.bq_always_ram),
+                binary=BinaryQuantizationConfig(
+                    always_ram=self.bq_always_ram,
+                    memory=quant_memory,
+                    encoding=encoding,
+                    query_encoding=query_encoding,
+                ),
+            )
+        if self.quantization_mode == "turbo":
+            from qdrant_client.http.models import (
+                TurboQuantBitSize,
+                TurboQuantization,
+                TurboQuantQuantizationConfig,
+            )
+
+            bits = {
+                "bits1": TurboQuantBitSize.BITS1,
+                "bits1_5": TurboQuantBitSize.BITS1_5,
+                "bits2": TurboQuantBitSize.BITS2,
+                "bits4": TurboQuantBitSize.BITS4,
+            }.get(self.turbo_bits, TurboQuantBitSize.BITS1_5)
+            return TurboQuantization(
+                turbo=TurboQuantQuantizationConfig(
+                    bits=bits,
+                    always_ram=self.turbo_always_ram,
+                    memory=quant_memory,
+                ),
             )
         return None
 
@@ -155,6 +246,7 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
         from qdrant_client.http.models import (
             HnswConfigDiff,
             OptimizersConfigDiff,
+            PayloadStorageParams,
             WalConfigDiff,
         )
 
@@ -165,6 +257,8 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
             max_indexing_threads=self.max_indexing_threads,
             on_disk=self.hnsw_on_disk,
             payload_m=_none_if_zero(self.payload_m),
+            inline_storage=self.hnsw_inline_storage,
+            memory=_parse_memory_tier(self.hnsw_memory),
         )
 
         optimizers_config = OptimizersConfigDiff(
@@ -176,12 +270,16 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
             indexing_threshold=self.indexing_threshold,
             flush_interval_sec=self.flush_interval_sec,
             max_optimization_threads=_none_if_zero(self.max_optimization_threads),
+            prevent_unoptimized=self.prevent_unoptimized,
         )
 
         wal_config = WalConfigDiff(
             wal_capacity_mb=self.wal_capacity_mb,
             wal_segments_ahead=self.wal_segments_ahead,
+            wal_retain_closed=_none_if_zero(self.wal_retain_closed),
         )
+
+        payload_memory = _parse_memory_tier(self.payload_memory)
 
         return {
             "distance": self.parse_metric(),
@@ -189,6 +287,7 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
             "ef_construct": self.ef_construct,
             "on_disk": self.on_disk,
             "datatype": self._parse_datatype(),
+            "vector_memory": _parse_memory_tier(self.vector_memory),
             "hnsw_config": hnsw_config,
             "optimizers_config": optimizers_config,
             "wal_config": wal_config,
@@ -197,6 +296,7 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
             "replication_factor": self.replication_factor,
             "write_consistency_factor": self.write_consistency_factor,
             "on_disk_payload": self.on_disk_payload,
+            "payload_config": PayloadStorageParams(memory=payload_memory) if payload_memory is not None else None,
             "indexing_threshold": self.indexing_threshold,
         }
 
@@ -205,6 +305,11 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
             "exact": self.exact,
             "indexed_only": self.indexed_only,
         }
+
+        if self.search_acorn:
+            from qdrant_client.http.models import AcornSearchParams
+
+            search_params["acorn"] = AcornSearchParams(enable=True)
 
         if self.hnsw_ef and self.hnsw_ef != 0:
             search_params["hnsw_ef"] = self.hnsw_ef

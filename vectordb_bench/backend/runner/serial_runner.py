@@ -312,10 +312,12 @@ class SerialSearchRunner:
         ground_truth: list[list[int]],
         k: int = 100,
         filters: Filter = non_filter,
+        timeout_seconds: float | None = None,
     ):
         self.db = db
         self.k = k
         self.filters = filters
+        self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else None
 
         if isinstance(test_data[0], np.ndarray):
             self.test_data = [query.tolist() for query in test_data]
@@ -347,7 +349,16 @@ class SerialSearchRunner:
             log.debug(f"ground truth size: {len(ground_truth)}")
 
             latencies, recalls, ndcgs = [], [], []
+            loop_start = time.perf_counter()
             for idx, emb in enumerate(test_data):
+                if self.timeout_seconds and time.perf_counter() - loop_start >= self.timeout_seconds:
+                    log.info(
+                        f"{mp.current_process().name:14} serial search time cap "
+                        f"({self.timeout_seconds}s) reached after {idx} of {len(test_data)} queries; "
+                        f"stopping early and continuing to the next stage"
+                    )
+                    break
+
                 s = time.perf_counter()
                 try:
                     results = self._get_db_search_res(emb)
@@ -370,6 +381,13 @@ class SerialSearchRunner:
                         f"({mp.current_process().name:14}) search_count={len(latencies):3}, "
                         f"latest_latency={latencies[-1]}, latest recall={recalls[-1]}"
                     )
+
+        if not latencies:
+            log.warning(
+                f"{mp.current_process().name:14} serial search time cap reached before any "
+                "query completed; reporting zeroed recall/latency for this stage"
+            )
+            return (0.0, 0.0, 0.0, 0.0)
 
         avg_latency = round(np.mean(latencies), 4)
         avg_recall = round(np.mean(recalls), 4)

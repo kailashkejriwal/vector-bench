@@ -38,6 +38,9 @@ class config:
 
     CONCURRENCY_TIMEOUT = 3600
 
+    # Time cap (minutes) for the serial search stage; 0 = no cap (run to completion).
+    SEARCH_SERIAL_TIMEOUT_MINUTES = 0
+
     # Skip psutil in kill_proc_tree. Default True to avoid PermissionError on macOS/restricted VMs.
     # Set VDB_SKIP_PSUTIL=0 to enable process-tree kill on Stop.
     VDB_SKIP_PSUTIL = env.bool("VDB_SKIP_PSUTIL", True)

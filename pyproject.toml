@@ -42,7 +42,7 @@ dependencies = [
     "pymilvus", # with pandas, numpy, ujson
     "ujson",
     "hdrhistogram>=0.10.1",
-    "qdrant-client",
+    "qdrant-client>=1.19.0",
     "weaviate-client",
     "openpyxl>=3.1.0",
 ]
@@ -59,7 +59,7 @@ restful = [ "flask" ]
 all = [
     "grpcio==1.53.0", # for qdrant-client and pymilvus
     "grpcio-tools==1.53.0", # for qdrant-client and pymilvus
-    "qdrant-client",
+    "qdrant-client>=1.19.0",
     "pinecone",
     "weaviate-client",
     "elasticsearch",
@@ -85,7 +85,7 @@ all = [
     "endee==0.1.10", # compatible with pydantic<2
 ]
 
-qdrant          = [ "qdrant-client" ]
+qdrant          = [ "qdrant-client>=1.19.0" ]
 pinecone        = [ "pinecone" ]
 weaviate        = [ "weaviate-client" ]
 elastic         = [ "elasticsearch" ]

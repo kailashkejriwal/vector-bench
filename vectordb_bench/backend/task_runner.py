@@ -493,12 +493,14 @@ class CaseRunner(BaseModel):
         gt_df = self.ca.dataset.gt_data
 
         if TaskStage.SEARCH_SERIAL in self.config.stages:
+            timeout_minutes = self.config.case_config.search_serial_timeout_minutes
             self.serial_search_runner = SerialSearchRunner(
                 db=self.db,
                 test_data=self.test_emb,
                 ground_truth=gt_df,
                 filters=self.ca.filters,
                 k=self.config.case_config.k,
+                timeout_seconds=timeout_minutes * 60 if timeout_minutes else None,
             )
         if TaskStage.SEARCH_CONCURRENT in self.config.stages:
             self.search_runner = MultiProcessingSearchRunner(

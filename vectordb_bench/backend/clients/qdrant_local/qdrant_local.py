@@ -23,7 +23,7 @@ from qdrant_client.http.models import (
 from vectordb_bench.backend.filter import Filter, FilterOp
 
 from ..api import VectorDB
-from .config import QdrantLocalIndexConfig
+from .config import QdrantLocalIndexConfig, _none_if_zero
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +89,12 @@ class QdrantLocal(VectorDB):
         self.with_scalar_labels = with_scalar_labels
         self.query_filter: QdrantFilter | None = None
 
+        # Cache write/search request behaviour from the case config.
+        self._wait = self.case_config.wait
+        self._write_ordering = self.case_config.parse_write_ordering()
+        self._search_consistency = self.case_config.parse_search_consistency()
+        self._search_timeout = _none_if_zero(self.case_config.search_timeout_sec)
+
         self._primary_field = "pk"
         self._scalar_label_field = "label"
         self._vector_field = "vector"
@@ -142,6 +148,7 @@ class QdrantLocal(VectorDB):
                         distance=ip["distance"],
                         on_disk=ip["on_disk"],
                         datatype=ip["datatype"],
+                        memory=ip["vector_memory"],
                     ),
                     hnsw_config=ip["hnsw_config"],
                     optimizers_config=ip["optimizers_config"],
@@ -151,6 +158,7 @@ class QdrantLocal(VectorDB):
                     replication_factor=ip["replication_factor"],
                     write_consistency_factor=ip["write_consistency_factor"],
                     on_disk_payload=ip["on_disk_payload"],
+                    payload=ip["payload_config"],
                 )
 
                 qdrant_client.create_payload_index(
@@ -271,7 +279,8 @@ class QdrantLocal(VectorDB):
                     payloads = [{self._primary_field: v} for v in ids]
                 _ = self.client.upsert(
                     collection_name=self.collection_name,
-                    wait=True,
+                    wait=self._wait,
+                    ordering=self._write_ordering,
                     points=Batch(ids=ids, payloads=payloads, vectors=vectors),
                 )
                 insert_count += len(ids)
@@ -307,6 +316,8 @@ class QdrantLocal(VectorDB):
             limit=k,
             query_filter=self.query_filter,
             search_params=SearchParams(**self.search_parameter),
+            consistency=self._search_consistency,
+            timeout=timeout if timeout is not None else self._search_timeout,
         ).points
 
         return [result.id for result in res]
@@ -337,7 +348,8 @@ class QdrantLocal(VectorDB):
                     payloads = [{self._primary_field: pk} for pk in ids]
                 self.client.upsert(
                     collection_name=self.collection_name,
-                    wait=True,
+                    wait=self._wait,
+                    ordering=self._write_ordering,
                     points=Batch(ids=ids, payloads=payloads, vectors=vectors),
                 )
                 updated += len(ids)

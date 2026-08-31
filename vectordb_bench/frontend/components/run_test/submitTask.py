@@ -2,7 +2,7 @@ from datetime import datetime
 from vectordb_bench import config
 from vectordb_bench.frontend.config import styles
 from vectordb_bench.interface import benchmark_runner
-from vectordb_bench.models import TaskConfig
+from vectordb_bench.models import TaskConfig, TaskStage
 
 
 def submitTask(st, tasks, isAllValid):
@@ -61,11 +61,44 @@ def advancedSettings(st):
         "Concurrency Duration", value=config.CONCURRENCY_DURATION, label_visibility="collapsed"
     )
     container[1].caption("concurrency duration for each concurrency search test")
-    return index_already_exists, use_aliyun, k, concurrentInput, concurrency_duration
+
+    container = st.columns([1, 2])
+    run_search_serial = container[0].checkbox("Run sequential search", value=True)
+    container[1].caption("if unchecked, the sequential search stage is skipped entirely.")
+
+    container = st.columns([1, 2])
+    search_serial_timeout_minutes = container[0].number_input(
+        "Sequential Search Time Cap (minutes)",
+        min_value=0.0,
+        value=float(config.SEARCH_SERIAL_TIMEOUT_MINUTES),
+        label_visibility="collapsed",
+        disabled=not run_search_serial,
+    )
+    container[1].caption(
+        "stop sequential search early after this many minutes and continue to the next stage; "
+        "0 = no time limit. Useful for sampling recall/latency on very large datasets without a full serial pass."
+    )
+    return (
+        index_already_exists,
+        use_aliyun,
+        k,
+        concurrentInput,
+        concurrency_duration,
+        run_search_serial,
+        search_serial_timeout_minutes,
+    )
 
 
 def controlPanel(st, tasks: list[TaskConfig], taskLabel, isAllValid):
-    index_already_exists, use_aliyun, k, concurrentInput, concurrency_duration = advancedSettings(st)
+    (
+        index_already_exists,
+        use_aliyun,
+        k,
+        concurrentInput,
+        concurrency_duration,
+        run_search_serial,
+        search_serial_timeout_minutes,
+    ) = advancedSettings(st)
 
     def runHandler():
         benchmark_runner.set_drop_old(not index_already_exists)
@@ -80,6 +113,9 @@ def controlPanel(st, tasks: list[TaskConfig], taskLabel, isAllValid):
             task.case_config.k = k
             task.case_config.concurrency_search_config.num_concurrency = concurrentInput_list
             task.case_config.concurrency_search_config.concurrency_duration = concurrency_duration
+            task.case_config.search_serial_timeout_minutes = search_serial_timeout_minutes
+            if not run_search_serial:
+                task.stages = [s for s in task.stages if s != TaskStage.SEARCH_SERIAL]
         benchmark_runner.set_download_address(use_aliyun)
         benchmark_runner.run(tasks, taskLabel)
 

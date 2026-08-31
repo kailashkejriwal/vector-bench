@@ -323,6 +323,16 @@ class CommonTypedDict(TypedDict):
             "Set to a negative value to wait indefinitely.",
         ),
     ]
+    search_serial_timeout_minutes: Annotated[
+        float,
+        click.option(
+            "--search-serial-timeout-minutes",
+            type=float,
+            default=config.SEARCH_SERIAL_TIMEOUT_MINUTES,
+            show_default=True,
+            help="Time cap in minutes for the serial search stage; 0 = no cap",
+        ),
+    ]
     custom_case_name: Annotated[
         str,
         click.option(
@@ -691,6 +701,7 @@ def run(
                 num_concurrency=[int(s) for s in parameters["num_concurrency"]],
                 concurrency_timeout=parameters["concurrency_timeout"],
             ),
+            search_serial_timeout_minutes=parameters["search_serial_timeout_minutes"],
             custom_case=get_custom_case_config(parameters),
         ),
         stages=parse_task_stages(

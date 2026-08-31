@@ -195,6 +195,23 @@ class CaseConfigParamType(Enum):
     quant_rescore = "quant_rescore"
     quant_oversampling = "quant_oversampling"
     quant_ignore = "quant_ignore"
+    # Qdrant additional config (qdrant-client >= 1.19.0 required for memory-tier / turbo fields)
+    hnsw_inline_storage = "hnsw_inline_storage"
+    prevent_unoptimized = "prevent_unoptimized"
+    wal_retain_closed = "wal_retain_closed"
+    search_acorn = "search_acorn"
+    wait = "wait"
+    write_ordering = "write_ordering"
+    search_consistency = "search_consistency"
+    search_timeout_sec = "search_timeout_sec"
+    vector_memory = "vector_memory"
+    hnsw_memory = "hnsw_memory"
+    quant_memory = "quant_memory"
+    payload_memory = "payload_memory"
+    turbo_bits = "turbo_bits"
+    turbo_always_ram = "turbo_always_ram"
+    binary_encoding = "binary_encoding"
+    binary_query_encoding = "binary_query_encoding"
     # Weaviate HNSW optimization (dynamic ef when ef=-1)
     dynamic_ef_factor = "dynamicEfFactor"
     dynamic_ef_min = "dynamicEfMin"
@@ -235,6 +252,8 @@ class CaseConfig(BaseModel):
     custom_case: dict | None = None
     k: int | None = config.K_DEFAULT
     concurrency_search_config: ConcurrencySearchConfig = ConcurrencySearchConfig()
+    # Time cap (minutes) for the serial search stage; 0/None = no cap (run to completion).
+    search_serial_timeout_minutes: float = config.SEARCH_SERIAL_TIMEOUT_MINUTES
 
     '''
     @property
