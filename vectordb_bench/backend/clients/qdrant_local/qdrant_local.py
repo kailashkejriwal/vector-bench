@@ -192,6 +192,18 @@ class QdrantLocal(VectorDB):
 
     def optimize(self, data_size: int | None = None):
         assert self.client, "Please call self.init() before"
+        # Re-enable indexing now that loading is complete (insert_embeddings() disables it
+        # for fast bulk insertion; this is the single, reliable place to restore it, since
+        # optimize() is only ever called once, after the whole load has finished).
+        configured_threshold = self.case_config.index_param()["indexing_threshold"]
+        self.client.update_collection(
+            collection_name=self.collection_name,
+            optimizer_config=OptimizersConfigDiff(indexing_threshold=configured_threshold),
+        )
+        log.info(
+            f"Restored indexing_threshold={configured_threshold} for collection: {self.collection_name}; "
+            "waiting for indexing to complete"
+        )
         # wait for vectors to be fully indexed
         try:
             while True:
@@ -200,11 +212,17 @@ class QdrantLocal(VectorDB):
                 if info.status != CollectionStatus.GREEN:
                     continue
                 if info.status == CollectionStatus.GREEN:
-                    log.info(f"Finishing building index for collection: {self.collection_name}")
                     msg = (
                         f"Stored vectors: {info.points_count}, Indexed vectors: {info.indexed_vectors_count}, "
                         f"Collection status: {info.status}"
                     )
+                    if configured_threshold != 0 and info.points_count > 0 and info.indexed_vectors_count == 0:
+                        log.warning(
+                            f"Collection {self.collection_name} is GREEN but indexed_vectors_count=0 with "
+                            f"{info.points_count} points stored; searches will fall back to brute-force scan. "
+                            "This is expected for very small/low-dim collections, but unexpected otherwise."
+                        )
+                    log.info(f"Finishing building index for collection: {self.collection_name}")
                     log.info(msg)
                     return
 
@@ -260,7 +278,14 @@ class QdrantLocal(VectorDB):
         assert len(embeddings_list) == len(metadata)
         insert_count = 0
 
-        # disable indexing for quick insertion
+        # Disable indexing for quick insertion. insert_embeddings() is called once per
+        # insert-batch-size chunk (potentially many times across a large load, and inside a
+        # subprocess whose in-memory state never propagates back to the main process), so we
+        # can't reliably track "already disabled" with an instance flag here. Instead we
+        # re-assert disabled=0 before every call (idempotent, cheap) and rely on optimize() —
+        # which always runs once, in the main process, only after the whole load completes — to
+        # restore the real threshold exactly once. This avoids leaving indexing permanently
+        # disabled if the load is interrupted (timeout/kill/stop) between batches.
         self.client.update_collection(
             collection_name=self.collection_name,
             optimizer_config=OptimizersConfigDiff(indexing_threshold=0),
@@ -284,14 +309,6 @@ class QdrantLocal(VectorDB):
                     points=Batch(ids=ids, payloads=payloads, vectors=vectors),
                 )
                 insert_count += len(ids)
-            # re-enable indexing after insertion using the configured threshold
-            self.client.update_collection(
-                collection_name=self.collection_name,
-                optimizer_config=OptimizersConfigDiff(
-                    indexing_threshold=self.case_config.index_param()["indexing_threshold"],
-                ),
-            )
-
         except Exception as e:
             log.info(f"Failed to insert data, {e}")
             return insert_count, e
