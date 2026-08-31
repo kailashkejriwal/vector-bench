@@ -351,11 +351,10 @@ class QdrantLocal(VectorDB):
                     collection_name=self.collection_name,
                     wait=self._wait,
                     vectors=vectors,
-                    payloads=payloads,
+                    payload=payloads,
                     ids=ids,
                     parallel=4,
-                    batch_size=256,
-                    show_progress=True,
+                    batch_size=256
                 )
                 t3 = time.perf_counter()
                 log.info(f"Time to upsert batch: {t3 - t2} seconds")
