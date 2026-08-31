@@ -110,6 +110,16 @@ class QdrantLocalTypedDict(CommonTypedDict):
         int,
         click.option("--indexing-threshold", type=int, default=20000, help="Indexing threshold in KB"),
     ]
+    disable_indexing_during_load: Annotated[
+        bool,
+        click.option(
+            "--disable-indexing-during-load/--no-disable-indexing-during-load",
+            type=bool,
+            default=True,
+            help="Disable indexing (force indexing_threshold=0) for the whole load stage, restoring it "
+            "afterwards. Pass --no-disable-indexing-during-load to index concurrently with ingestion instead.",
+        ),
+    ]
     flush_interval_sec: Annotated[
         int,
         click.option("--flush-interval-sec", type=int, default=5, help="Flush interval in seconds"),
@@ -346,6 +356,7 @@ def QdrantLocal(**parameters: Unpack[QdrantLocalTypedDict]):
             max_segment_size=parameters["max_segment_size"],
             memmap_threshold=parameters["memmap_threshold"],
             indexing_threshold=parameters["indexing_threshold"],
+            disable_indexing_during_load=parameters["disable_indexing_during_load"],
             flush_interval_sec=parameters["flush_interval_sec"],
             max_optimization_threads=parameters["max_optimization_threads"],
             prevent_unoptimized=parameters["prevent_unoptimized"],

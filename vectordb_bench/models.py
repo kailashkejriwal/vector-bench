@@ -176,6 +176,7 @@ class CaseConfigParamType(Enum):
     max_segment_size = "max_segment_size"
     memmap_threshold = "memmap_threshold"
     indexing_threshold = "indexing_threshold"
+    disable_indexing_during_load = "disable_indexing_during_load"
     flush_interval_sec = "flush_interval_sec"
     max_optimization_threads = "max_optimization_threads"
     wal_capacity_mb = "wal_capacity_mb"

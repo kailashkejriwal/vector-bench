@@ -192,18 +192,26 @@ class QdrantLocal(VectorDB):
 
     def optimize(self, data_size: int | None = None):
         assert self.client, "Please call self.init() before"
-        # Re-enable indexing now that loading is complete (insert_embeddings() disables it
-        # for fast bulk insertion; this is the single, reliable place to restore it, since
-        # optimize() is only ever called once, after the whole load has finished).
         configured_threshold = self.case_config.index_param()["indexing_threshold"]
-        self.client.update_collection(
-            collection_name=self.collection_name,
-            optimizer_config=OptimizersConfigDiff(indexing_threshold=configured_threshold),
-        )
-        log.info(
-            f"Restored indexing_threshold={configured_threshold} for collection: {self.collection_name}; "
-            "waiting for indexing to complete"
-        )
+        if self.case_config.disable_indexing_during_load:
+            # Re-enable indexing now that loading is complete (insert_embeddings() disables it
+            # for fast bulk insertion; this is the single, reliable place to restore it, since
+            # optimize() is only ever called once, after the whole load has finished).
+            self.client.update_collection(
+                collection_name=self.collection_name,
+                optimizer_config=OptimizersConfigDiff(indexing_threshold=configured_threshold),
+            )
+            log.info(
+                f"Restored indexing_threshold={configured_threshold} for collection: {self.collection_name}; "
+                "waiting for indexing to complete"
+            )
+        else:
+            # indexing_threshold was never touched during load, so indexing has been running
+            # concurrently with ingestion the whole time; just wait for any remaining tail to finish.
+            log.info(
+                f"disable_indexing_during_load=False; indexing_threshold stayed at {configured_threshold} "
+                f"throughout the load for collection: {self.collection_name}. Waiting for indexing to catch up."
+            )
         # wait for vectors to be fully indexed
         try:
             while True:
@@ -278,18 +286,22 @@ class QdrantLocal(VectorDB):
         assert len(embeddings_list) == len(metadata)
         insert_count = 0
 
-        # Disable indexing for quick insertion. insert_embeddings() is called once per
-        # insert-batch-size chunk (potentially many times across a large load, and inside a
-        # subprocess whose in-memory state never propagates back to the main process), so we
-        # can't reliably track "already disabled" with an instance flag here. Instead we
-        # re-assert disabled=0 before every call (idempotent, cheap) and rely on optimize() —
-        # which always runs once, in the main process, only after the whole load completes — to
-        # restore the real threshold exactly once. This avoids leaving indexing permanently
-        # disabled if the load is interrupted (timeout/kill/stop) between batches.
-        self.client.update_collection(
-            collection_name=self.collection_name,
-            optimizer_config=OptimizersConfigDiff(indexing_threshold=0),
-        )
+        if self.case_config.disable_indexing_during_load:
+            # Disable indexing for quick insertion. insert_embeddings() is called once per
+            # insert-batch-size chunk (potentially many times across a large load, and inside a
+            # subprocess whose in-memory state never propagates back to the main process), so we
+            # can't reliably track "already disabled" with an instance flag here. Instead we
+            # re-assert disabled=0 before every call (idempotent, cheap) and rely on optimize() —
+            # which always runs once, in the main process, only after the whole load completes — to
+            # restore the real threshold exactly once. This avoids leaving indexing permanently
+            # disabled if the load is interrupted (timeout/kill/stop) between batches.
+            self.client.update_collection(
+                collection_name=self.collection_name,
+                optimizer_config=OptimizersConfigDiff(indexing_threshold=0),
+            )
+        # else: indexing_threshold stays at its configured value (set at collection creation),
+        # so Qdrant indexes each segment as it fills up while ingestion is still in progress -
+        # simulating a real-world concurrent write+index workload instead of a bulk-load mode.
         try:
             for offset in range(0, len(embeddings_list), QDRANT_BATCH_SIZE):
                 vectors = embeddings_list[offset : offset + QDRANT_BATCH_SIZE]

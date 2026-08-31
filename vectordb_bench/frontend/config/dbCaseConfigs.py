@@ -2507,9 +2507,21 @@ CaseConfigParamInput_memmap_threshold_QdrantLocal = CaseConfigInput(
 CaseConfigParamInput_indexing_threshold_QdrantLocal = CaseConfigInput(
     label=_opt_param("indexing_threshold"),
     displayLabel="indexing_threshold (KB)",
-    inputHelp="Minimum segment size (KB) before the HNSW index is built. Qdrant default 20000. (Indexing is disabled during bulk load and re-enabled at this value.)",
+    inputHelp="Minimum segment size (KB) before the HNSW index is built. Qdrant default 20000. "
+    "By default this is forced to 0 (disabled) during the load stage and restored to this value afterwards; "
+    "uncheck 'Disable indexing during load' below to keep it active throughout the load instead.",
     inputType=InputType.Number,
     inputConfig={"min": 0, "max": 1_000_000_000, "value": 20000},
+)
+CaseConfigParamInput_disable_indexing_during_load_QdrantLocal = CaseConfigInput(
+    label=_opt_param("disable_indexing_during_load"),
+    displayLabel="Disable indexing during load",
+    inputHelp="If checked (default), indexing_threshold is forced to 0 for the whole load stage and restored "
+    "afterwards, for maximum bulk-insert speed. Uncheck to leave indexing_threshold at its configured value "
+    "throughout the load, so Qdrant indexes segments concurrently with ingestion - closer to a real-world "
+    "streaming-write workload, at the cost of slower insertion.",
+    inputType=InputType.Bool,
+    inputConfig={"value": True},
 )
 CaseConfigParamInput_flush_interval_sec_QdrantLocal = CaseConfigInput(
     label=_opt_param("flush_interval_sec"),
@@ -2789,6 +2801,7 @@ QdrantLocalLoadConfig = [
     CaseConfigParamInput_max_segment_size_QdrantLocal,
     CaseConfigParamInput_memmap_threshold_QdrantLocal,
     CaseConfigParamInput_indexing_threshold_QdrantLocal,
+    CaseConfigParamInput_disable_indexing_during_load_QdrantLocal,
     CaseConfigParamInput_flush_interval_sec_QdrantLocal,
     CaseConfigParamInput_max_optimization_threads_QdrantLocal,
     CaseConfigParamInput_prevent_unoptimized_QdrantLocal,

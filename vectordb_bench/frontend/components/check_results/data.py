@@ -1,6 +1,8 @@
 import re
 from collections import defaultdict
 from dataclasses import asdict
+
+from vectordb_bench.backend.clients.qdrant_local.config import QdrantLocalIndexConfig
 from vectordb_bench.metric import QPS_METRIC, isLowerIsBetterMetric
 
 # Concurrency metrics are not captured or shown in results
@@ -38,19 +40,29 @@ def _to_snake(name: str) -> str:
 
 
 def get_tuning_display_dict(db_case_config) -> dict:
-    """Return a dict of tuning param -> value for summary display."""
+    """Return a dict of tuning param -> value for summary display.
+
+    Qdrant's self-hosted config exposes every tunable Qdrant parameter (see
+    QdrantLocalIndexConfig), so for that DB we show every field rather than filtering
+    through TUNING_DISPLAY_KEYS - that allowlist is curated for the many other DB
+    integrations and would otherwise need a manual update each time a Qdrant option
+    is added, silently hiding new params from the results page and Excel export.
+    """
     if not db_case_config:
         return {}
     try:
         d = db_case_config.dict()
     except Exception:
         return {}
+
+    show_all = isinstance(db_case_config, QdrantLocalIndexConfig)
+
     out = {}
     for k, v in d.items():
         if v is None or (isinstance(v, str) and v.strip() == ""):
             continue
         snake = _to_snake(k)
-        if k in TUNING_DISPLAY_KEYS or snake in {_to_snake(x) for x in TUNING_DISPLAY_KEYS}:
+        if show_all or k in TUNING_DISPLAY_KEYS or snake in {_to_snake(x) for x in TUNING_DISPLAY_KEYS}:
             out[snake] = v
     return out
 

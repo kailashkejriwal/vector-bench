@@ -67,6 +67,12 @@ class QdrantLocalIndexConfig(BaseModel, DBCaseConfig):
     max_segment_size: int = 0  # in KB, 0 = unset (unlimited)
     memmap_threshold: int = 0  # in KB, 0 = unset
     indexing_threshold: int = 20000  # in KB
+    # If True (default), indexing is disabled (indexing_threshold forced to 0) for the whole
+    # load stage and only restored/finished afterwards, for maximum bulk-insert throughput.
+    # If False, indexing_threshold is left at its configured value throughout the load, so
+    # Qdrant builds/updates the HNSW index for each segment concurrently with ingestion -
+    # closer to a real-world streaming-write workload, at the cost of slower insertion.
+    disable_indexing_during_load: bool = True
     flush_interval_sec: int = 5
     max_optimization_threads: int = 0  # 0 = unset (auto)
     prevent_unoptimized: bool = False  # refuse to serve search from unoptimized segments
