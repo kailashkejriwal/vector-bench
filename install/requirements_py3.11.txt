@@ -1,6 +1,6 @@
 grpcio==1.53.2
 grpcio-tools==1.53.0
-qdrant-client
+qdrant-client>=1.19.0
 pinecone
 weaviate-client
 elasticsearch==8.16.0
