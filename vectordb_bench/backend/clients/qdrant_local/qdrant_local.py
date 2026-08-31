@@ -347,10 +347,12 @@ class QdrantLocal(VectorDB):
                     payloads = [{self._primary_field: v} for v in ids]
                 t2 = time.perf_counter()
                 log.info(f"Time to create batch: {t2 - t1} seconds")
-                _ = self.client.upload_points(
+                _ = self.client.upload_collection(
                     collection_name=self.collection_name,
                     wait=self._wait,
-                    points=zip(ids, payloads, vectors),
+                    vectors=vectors,
+                    payloads=payloads,
+                    ids=ids,
                     parallel=4,
                     batch_size=256,
                     show_progress=True,
