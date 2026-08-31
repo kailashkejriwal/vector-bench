@@ -72,7 +72,7 @@ class QdrantDockerProvisioner(DockerContainerProvisioner):
         path = pathlib.Path(data_dir)
         path.mkdir(parents=True, exist_ok=True)
         log.info("Qdrant: using storage dir on host %s (NVMe/large disk)", path)
-        return ["-v", f"{path}:{QDRANT_CONTAINER_STORAGE}"]
+        return ["-v", f"{path}:{QDRANT_CONTAINER_STORAGE}", "-e", "QDRANT__SERVICE__MAX_REQUEST_SIZE_MB=1024"]
 
     def _connection_info(self, host_port: str) -> ConnectionInfo:
         return {
