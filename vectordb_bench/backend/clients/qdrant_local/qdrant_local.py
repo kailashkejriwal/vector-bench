@@ -332,7 +332,9 @@ class QdrantLocal(VectorDB):
         # simulating a real-world concurrent write+index workload instead of a bulk-load mode.
         try:
             upsert_batch_size = self._upsert_batch_size
+            t0 = time.perf_counter()
             for offset in range(0, len(embeddings_list), upsert_batch_size):
+                t1 = time.perf_counter()
                 vectors = embeddings_list[offset : offset + upsert_batch_size]
                 ids = metadata[offset : offset + upsert_batch_size]
                 if self.with_scalar_labels and labels_data is not None:
@@ -343,13 +345,19 @@ class QdrantLocal(VectorDB):
                     ]
                 else:
                     payloads = [{self._primary_field: v} for v in ids]
+                t2 = time.perf_counter()
+                log.info(f"Time to create batch: {t2 - t1} seconds")
                 _ = self.client.upsert(
                     collection_name=self.collection_name,
                     wait=self._wait,
                     ordering=self._write_ordering,
                     points=Batch(ids=ids, payloads=payloads, vectors=vectors),
                 )
+                t3 = time.perf_counter()
+                log.info(f"Time to upsert batch: {t3 - t2} seconds")
                 insert_count += len(ids)
+            t4 = time.perf_counter()
+            log.info(f"Time to insert data: {t4 - t0} seconds")
         except Exception as e:
             log.info(f"Failed to insert data, {e}")
             return insert_count, e
